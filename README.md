@@ -1,11 +1,12 @@
 <!-- ── PERSONAL FORK NOTICE (custom branch) ──────────────────────────────── -->
-> **⚙️ This is SuooL's personalized fork of Trellis (`custom` branch).**
+> **⚙️ Trellis-Enhance** — SuooL's self-maintained fork of Trellis (package renamed `trellis-enhance`, on the `custom` branch; command stays `trellis` / `tl`).
 > It bakes custom defaults into `trellis init`: model-routed sub-agents (Opus writes / Codex 5.5 reviews),
 > a dual-model adversarial-review capability (`/trellis:question`), extra workflow states
 > (`needs-rework` / `blocked` / `deploying`), and an always-generated Git + GitHub-Actions CI/CD standard.
+> Self-owned: `trellis update` refreshes only from this CLI's templates (no upstream npm check).
 >
-> 👉 **Fork background, customization catalog & maintenance:** see **[FORK.md](./FORK.md)** · quick context auto-loads from **[CLAUDE.md](./CLAUDE.md)**.
-> Install: `npm i -g 'git+https://github.com/SuooL/Trellis.git#custom'`
+> 👉 **Background, customization catalog, dev-loop & maintenance:** see **[FORK.md](./FORK.md)** · quick context auto-loads from **[CLAUDE.md](./CLAUDE.md)**.
+> Dev = symlink install; edit → `pnpm --filter trellis-enhance build` → live (never reinstall).
 >
 > _The original upstream README follows unchanged._
 

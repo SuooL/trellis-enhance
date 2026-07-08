@@ -4,11 +4,17 @@
      For the full story see FORK.md.
      ═══════════════════════════════════════════════════════════════════════ -->
 
-# Personal Fork Context — SuooL/Trellis (`custom` branch)
+# Trellis-Enhance — SuooL's self-maintained fork (`custom` branch)
 
-This repo is **SuooL's personal fork** of Trellis (`mindfold-ai/Trellis`). It is the **Trellis CLI source** — not a project that *uses* Trellis. Customizations live in the CLI's templates/configurators; the built `trellis init` then generates them into any target project.
+This repo is **`trellis-enhance`** — SuooL's own, self-maintained product, forked from Trellis
+(`mindfold-ai/Trellis`). The npm package is renamed to **`trellis-enhance`** (bins stay `trellis` / `tl`);
+it does **not** track or phone the upstream npm package. It is the **CLI source** — not a project that
+*uses* Trellis. Customizations live in the CLI's templates/configurators; the built `trellis init` then
+generates them into any target project.
 
-**Goal:** a personalized "自己特色的 Trellis" — my own default workflow (model routing, cross-model review, extra workflow states, an adversarial-review capability, and a Git/CI standard) that every `trellis init` produces out of the box.
+**Goal:** my own opinionated default workflow — model routing, cross-model review, extra workflow states,
+an adversarial-review capability, and a Git/CI standard — baked into every `trellis init`. Self-owned:
+`trellis update` refreshes a project purely from THIS CLI's templates; no upstream version check.
 
 ## Branch model (important)
 - **`custom`** — all my customizations live here. Ship/install from this branch. **You are normally on `custom`.**
@@ -24,19 +30,31 @@ This repo is **SuooL's personal fork** of Trellis (`mindfold-ai/Trellis`). It is
 | **Git/CI standard** (always generated) | 3-branch model (main=release / dev=integration+CD-to-prod / `feature/<task-slug>`); PR→dev → CI (build+tests+**diff-coverage ≥ 80%**) → auto-merge; dev→prod SSH deploy (opt-in via `vars.DEPLOY_ENABLED`); manual `workflow_dispatch` release; weekly branch prune. Emitted on every `trellis init`. | `templates/git-workflow/` (spec + 4 `.github/workflows/*.yml` + README), wired in `templates/git-workflow/index.ts` + `configurators/workflow.ts` + `templates/trellis/index.ts` |
 | **Branch lifecycle hook** | `after_create` → create `feature/<slug>` off `dev` (safe-skips on non-git); `after_archive` → delete merged branch | `templates/trellis/scripts/hooks/git_branch.py`, `templates/trellis/config.yaml` (hooks) |
 
-## Working here (build / verify / install)
+## How install works — symlink dev, rebuild = live, NEVER reinstall
+
+The global `trellis` / `tl` command is **symlinked** to this repo's built output:
+`/opt/homebrew/bin/trellis → …/node_modules/…/bin/trellis.js → /Users/suool/git/Trellis/packages/cli`.
+So the global command runs **whatever is currently built in this working tree**.
+
+**The dev loop (no reinstall, ever):**
 ```bash
-pnpm install
-pnpm --filter @mindfoldhq/trellis build        # tsc + copy-templates
-pnpm --filter @mindfoldhq/trellis typecheck
-pnpm --filter @mindfoldhq/trellis test         # NOTE: 2 pre-existing failures in
-                                               # test/templates/trellis.test.ts (missing
-                                               # marketplace/workflows/{native,tdd}/workflow.md)
-                                               # are UPSTREAM/env, not from this fork.
+cd /Users/suool/git/Trellis            # stay on the `custom` branch
+# ...edit source under packages/cli/src/...
+pnpm --filter trellis-enhance build    # tsc + copy-templates → dist/ ; global `trellis` is now updated
+```
+- ✅ **Editing + `build` is all it takes** — the symlink means the change is live immediately. No `npm i -g`.
+- ⚠️ The global command = **"whatever branch is checked out here + last build"**. If you ever `git checkout main` (to compare upstream) **and build there**, the global CLI temporarily loses the customizations. Switch back to `custom` and rebuild to restore.
+- 🔁 Only re-link if the symlink itself is ever removed: `cd packages/cli && pnpm link --global` (or `npm link`). After the `@mindfoldhq/trellis → trellis-enhance` rename the existing bin symlink still resolves by path, so no relink was needed.
+
+**Self-owned updates:** `trellis update` in a project refreshes its `.trellis/` from THIS CLI's templates only. The upstream-npm version check was removed (`getLatestNpmVersion()` returns null) — it never phones `registry.npmjs.org`.
+
+```bash
+pnpm --filter trellis-enhance typecheck
+pnpm --filter trellis-enhance test     # NOTE: 2 pre-existing failures in test/templates/trellis.test.ts
+                                       # (missing marketplace/workflows/{native,tdd}/workflow.md) are
+                                       # UPSTREAM/env, not from this fork.
 # Smoke-test the generated output in a scratch dir:
-d=$(mktemp -d); (cd "$d" && git init -q && node /Users/suool/git/trellis/packages/cli/dist/cli/index.js init --claude -y -u tester)
-# Install for personal use:
-npm i -g 'git+https://github.com/SuooL/Trellis.git#custom'
+d=$(mktemp -d); (cd "$d" && git init -q && node /Users/suool/git/Trellis/packages/cli/dist/cli/index.js init --claude -y -u tester)
 ```
 When you edit a template that a configurator renders per-platform, remember the **init-write path and the update-collect path must stay byte-identical** (see `.trellis/spec/cli/backend/configurator-shared.md`) or `trellis update` hash-tracking / tests break.
 

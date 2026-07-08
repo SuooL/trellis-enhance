@@ -1,8 +1,11 @@
-# FORK.md — SuooL's personalized Trellis
+# FORK.md — Trellis-Enhance (SuooL's self-maintained Trellis)
 
-> A personal fork of [Trellis](https://github.com/mindfold-ai/Trellis) that bakes my own workflow
-> defaults into `trellis init`. This document is the development record + maintenance guide.
-> For the auto-loaded quick context, see [`CLAUDE.md`](./CLAUDE.md) (top section).
+> **`trellis-enhance`** — my own, self-maintained product, forked from
+> [Trellis](https://github.com/mindfold-ai/Trellis). The npm package is renamed to `trellis-enhance`
+> (the command stays `trellis` / `tl`), and it does **not** track or phone the upstream npm package —
+> `trellis update` refreshes projects purely from this CLI's own templates. `upstream` is kept only as a
+> git remote for occasional manual comparison.
+> This document is the development record + maintenance guide. Auto-loaded quick context: [`CLAUDE.md`](./CLAUDE.md).
 
 ---
 
@@ -107,18 +110,31 @@ Every `trellis init` now also writes a complete Git workflow standard:
 
 ## 4. Build, verify, ship
 
+**Install model = symlink; rebuild = live; never reinstall.** The global `trellis` / `tl` is symlinked to
+this repo's build (`/opt/homebrew/bin/trellis → …/packages/cli`), so it runs whatever is currently built
+here. The dev loop is just edit → build:
+
 ```bash
-pnpm install
-pnpm --filter @mindfoldhq/trellis build       # tsc + copy-templates → dist/
-pnpm --filter @mindfoldhq/trellis typecheck
-pnpm --filter @mindfoldhq/trellis test        # see note below
+cd /Users/suool/git/Trellis                   # stay on `custom`
+# ...edit packages/cli/src/...
+pnpm --filter trellis-enhance build           # tsc + copy-templates → dist/ ; global `trellis` now updated
+pnpm --filter trellis-enhance typecheck
+pnpm --filter trellis-enhance test            # see note below
 
 # Smoke-test the generated output end-to-end:
 d=$(mktemp -d); ( cd "$d" && git init -q \
-  && node /Users/suool/git/trellis/packages/cli/dist/cli/index.js init --claude -y -u tester )
+  && node /Users/suool/git/Trellis/packages/cli/dist/cli/index.js init --claude -y -u tester )
 # expect: agents carry model:, workflow.md has the 3 custom states, question skill+command,
 #         git_branch.py hook, task.py set-status, .github/workflows/*, spec/tech/git-workflow.md
 ```
+
+- ⚠️ Global CLI = "current checked-out branch + last build here". `git checkout main` + build → temporarily
+  loses customizations; switch back to `custom` + rebuild to restore.
+- 🔁 Re-link only if the symlink is ever removed: `cd packages/cli && pnpm link --global`. (The
+  `@mindfoldhq/trellis → trellis-enhance` rename did not need a relink — the bin symlink resolves by path.)
+- ✋ No `npm i -g` for local dev. A from-scratch git-install (`npm i -g 'git+…#custom'`) is a fallback for
+  *other* machines, but note the CLI depends on `@mindfoldhq/trellis-core` via `workspace:*`, so a clean
+  external install may need adjustment — the symlink model above is the maintained path.
 
 **Test note:** `test/templates/trellis.test.ts` has **2 pre-existing failures** (missing
 `marketplace/workflows/{native,tdd}/workflow.md`). These files aren't tracked in the repo; the
