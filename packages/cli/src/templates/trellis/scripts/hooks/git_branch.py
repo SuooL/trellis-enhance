@@ -60,14 +60,29 @@ def _write_task(data: dict, path: str) -> None:
         f.write("\n")
 
 
+# Bound on any single git invocation. `create`/`cleanup` call `git fetch`
+# against a remote — without a timeout and with terminal prompts enabled, a
+# stalled network or an interactive credential/host-key prompt could hang the
+# lifecycle event indefinitely, which is worse than the "never fail" contract
+# this hook otherwise upholds (a bounded failure is recoverable; a hang isn't).
+_GIT_TIMEOUT_SECONDS = 15
+
+
 def _git(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    try:
+        return subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=_GIT_TIMEOUT_SECONDS,
+            env=env,
+        )
+    except (subprocess.TimeoutExpired, OSError) as e:
+        _warn(f"git {' '.join(args)} failed to run ({e}) — treating as failure")
+        return subprocess.CompletedProcess(args, returncode=1, stdout="", stderr=str(e))
 
 
 def _is_git_repo() -> bool:

@@ -2,7 +2,7 @@
 
 Explicit entry point for a multi-role, dual-model adversarial + constructive review.
 
-Usage: `/trellis:question <question, or a pointer to the plan / design / code / doc to review>`
+Usage: `{{CMD_REF:question}} <question, or a pointer to the plan / design / code / doc to review>`
 
 ## What to do
 

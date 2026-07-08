@@ -70,6 +70,9 @@ export const taskScript = readTemplate("scripts/task.py");
 export const getContextScript = readTemplate("scripts/get_context.py");
 export const addSessionScript = readTemplate("scripts/add_session.py");
 
+// Python scripts - lifecycle hooks
+export const gitBranchHookScript = readTemplate("scripts/hooks/git_branch.py");
+
 // Configuration files
 export const workflowMdTemplate = readTemplate("workflow.md");
 export const configYamlTemplate = readTemplate("config.yaml");
@@ -120,6 +123,9 @@ export function getAllScripts(): Map<string, string> {
   scripts.set("task.py", taskScript);
   scripts.set("get_context.py", getContextScript);
   scripts.set("add_session.py", addSessionScript);
+
+  // Lifecycle hooks
+  scripts.set("hooks/git_branch.py", gitBranchHookScript);
 
   return scripts;
 }

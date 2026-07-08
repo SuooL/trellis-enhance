@@ -208,10 +208,17 @@ describe("uninstall() integration", () => {
     // empty-platform-root cleanup.
     await init({ yes: true, kilo: true, force: true });
 
-    // Detect kilo's actual config dir from manifest entries.
+    // Detect kilo's actual config dir from manifest entries. Exclude
+    // `.trellis/`, `AGENTS.md`, and `.github/` (the git-workflow standard's
+    // `.github/workflows/*` files are written on every init regardless of
+    // selected platform — see createGitWorkflowFiles in configurators/workflow.ts
+    // — and would otherwise be mistaken for kilo's platform root here).
     const hashesBefore = loadHashes(tmpDir);
     const kiloEntry = Object.keys(hashesBefore).find(
-      (p) => !p.startsWith(".trellis/") && p !== "AGENTS.md",
+      (p) =>
+        !p.startsWith(".trellis/") &&
+        !p.startsWith(".github/") &&
+        p !== "AGENTS.md",
     );
     if (!kiloEntry) throw new Error("test fixture: no kilo entries found");
     const kiloRoot = kiloEntry.split("/")[0];

@@ -37,6 +37,7 @@ import path from "node:path";
 import { collectPlatformTemplates } from "../configurators/index.js";
 import { FILE_NAMES } from "../constants/paths.js";
 import { getAllMigrations } from "../migrations/index.js";
+import { getGitWorkflowCiFiles } from "../templates/git-workflow/index.js";
 import { saveHashes } from "./template-hash.js";
 import { toPosix } from "./posix.js";
 import type { AITool } from "../types/ai-tools.js";
@@ -58,6 +59,14 @@ export interface PruneResult {
  *   - root-level AGENTS.md when it still carries Trellis managed-block markers
  *   - every migration manifest's from/to path (preserve so legitimate
  *     pending migrations can find their source/target)
+ *   - the git-workflow standard's `.github/workflows/*` files — these are
+ *     written on EVERY `trellis init` regardless of selected platform (see
+ *     `createGitWorkflowFiles` in configurators/workflow.ts), so they have no
+ *     platform-template owner in `collectPlatformTemplates()`. Without this,
+ *     their manifest entries get pruned as "orphan" on the very first
+ *     `trellis update`/`uninstall`, leaving the files permanently untracked —
+ *     `trellis uninstall` would then never delete them, breaking the
+ *     "init -> uninstall -> clean project" contract.
  */
 function buildKnownKeys(configuredPlatforms: readonly AITool[]): Set<string> {
   const known = new Set<string>();
@@ -74,6 +83,10 @@ function buildKnownKeys(configuredPlatforms: readonly AITool[]): Set<string> {
   for (const migration of getAllMigrations()) {
     if (migration.from) known.add(toPosix(migration.from));
     if (migration.to) known.add(toPosix(migration.to));
+  }
+
+  for (const name of getGitWorkflowCiFiles().keys()) {
+    known.add(`.github/workflows/${name}`);
   }
 
   return known;

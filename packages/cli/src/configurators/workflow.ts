@@ -117,10 +117,16 @@ export async function createWorkflowStructure(
     gitignoreTemplate,
   );
 
-  // Copy config.yaml from templates
+  // Copy config.yaml from templates. The lifecycle hooks section ships literal
+  // `python3` commands (git_branch.py), so this must go through
+  // replacePythonCommandLiterals the same as every other init-time write —
+  // otherwise Windows installs (resolved command "python" / "py -3") get a
+  // config.yaml whose hooks call a `python3` that may not exist, silently
+  // breaking `after_create`/`after_archive`. `trellis update` already applies
+  // this uniformly in collectTemplateFiles(); init must match.
   await writeFile(
     path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml"),
-    configYamlTemplate,
+    replacePythonCommandLiterals(configYamlTemplate),
   );
 
   // Git-workflow standard (always generated). Ships the three-branch spec into

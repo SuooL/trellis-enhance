@@ -2,7 +2,7 @@
 name: trellis-check
 description: |
   Code quality check expert. Reviews code changes against specs by delegating the review reasoning to an independent cross-model reviewer (Codex GPT-5.5), then self-fixes issues.
-tools: Read, Write, Edit, Bash, Glob, Grep, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__codex__codex
+tools: Read, Write, Edit, Bash, Glob, Grep, mcp__*
 model: sonnet
 ---
 # Check Agent (Cross-model review — Design 1)
@@ -22,7 +22,7 @@ You are already the `trellis-check` sub-agent that the main session dispatched. 
 Look for the `<!-- trellis-hook-injected -->` marker in your input above.
 
 - **If the marker is present**: prd / spec / research files have already been auto-loaded for you above. Proceed with the check work directly.
-- **If the marker is absent**: hook injection didn't fire (Windows + Claude Code, `--continue` resume, fork distribution, hooks disabled, etc.). Find the active task path from your dispatch prompt's first line `Active task: <path>`, then Read `<task-path>/prd.md` and the spec files listed in `<task-path>/check.jsonl` yourself before doing the work.
+- **If the marker is absent**: hook injection didn't fire (Windows + Claude Code, `--continue` resume, fork distribution, hooks disabled, etc.). Find the active task path from your dispatch prompt's first line `Active task: <path>`, then Read `<task-path>/check.jsonl`, each listed file, `<task-path>/prd.md`, `<task-path>/design.md` if present, and `<task-path>/implement.md` if present before doing the work.
 
 ## Core Responsibilities
 
