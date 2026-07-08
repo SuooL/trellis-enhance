@@ -1,3 +1,50 @@
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PERSONAL FORK CONTEXT (branch: custom) — read this first.
+     This block is fork-only; it lives on `custom`, not on `main`.
+     For the full story see FORK.md.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+# Personal Fork Context — SuooL/Trellis (`custom` branch)
+
+This repo is **SuooL's personal fork** of Trellis (`mindfold-ai/Trellis`). It is the **Trellis CLI source** — not a project that *uses* Trellis. Customizations live in the CLI's templates/configurators; the built `trellis init` then generates them into any target project.
+
+**Goal:** a personalized "自己特色的 Trellis" — my own default workflow (model routing, cross-model review, extra workflow states, an adversarial-review capability, and a Git/CI standard) that every `trellis init` produces out of the box.
+
+## Branch model (important)
+- **`custom`** — all my customizations live here. Ship/install from this branch. **You are normally on `custom`.**
+- **`main`** — kept as a clean mirror of upstream, for comparison only. Do NOT put customizations here.
+- **`upstream`** remote = `mindfold-ai/trellis`. Maintenance = periodically `git fetch upstream`, compare (`git diff upstream/main custom -- <paths>`), and cherry-pick/merge upstream changes into `custom` when worthwhile. Upstream-sync is NOT a hard constraint — reconcile manually when needed.
+
+## What's customized (all in `packages/cli/src/templates/…` + `…/configurators/`)
+| Area | What | Key files |
+|---|---|---|
+| **Sub-agent models** | implement=**Opus 4.8**; research=**Sonnet** (+ `mcp__codex__codex` tool for a cross-model 2nd opinion); check=**cross-model** — a thin Claude wrapper that delegates the review to **Codex GPT-5.5 (effort xhigh, read-only)** and applies fixes (Design 1) | `templates/claude/agents/trellis-{implement,research,check}.md` |
+| **Custom workflow states** | `needs-rework` / `blocked` / `deploying`, with per-turn breadcrumbs + `/continue` routing; writer = new `task.py set-status` (+ `cmd_set_status` in task_store) | `templates/trellis/workflow.md`, `templates/common/commands/continue.md`, `templates/trellis/scripts/task.py`, `…/common/task_store.py` |
+| **Question / adversarial review** | On-demand multi-role, **dual independent panels (Opus 4.8 + Codex GPT-5.5)** critical review; keyword-triggered skill + explicit command. New skill must be registered in `SKILL_DESCRIPTIONS` (shared.ts) | `templates/common/skills/adversarial-review.md`, `templates/common/commands/question.md`, `configurators/shared.ts` |
+| **Git/CI standard** (always generated) | 3-branch model (main=release / dev=integration+CD-to-prod / `feature/<task-slug>`); PR→dev → CI (build+tests+**diff-coverage ≥ 80%**) → auto-merge; dev→prod SSH deploy (opt-in via `vars.DEPLOY_ENABLED`); manual `workflow_dispatch` release; weekly branch prune. Emitted on every `trellis init`. | `templates/git-workflow/` (spec + 4 `.github/workflows/*.yml` + README), wired in `templates/git-workflow/index.ts` + `configurators/workflow.ts` + `templates/trellis/index.ts` |
+| **Branch lifecycle hook** | `after_create` → create `feature/<slug>` off `dev` (safe-skips on non-git); `after_archive` → delete merged branch | `templates/trellis/scripts/hooks/git_branch.py`, `templates/trellis/config.yaml` (hooks) |
+
+## Working here (build / verify / install)
+```bash
+pnpm install
+pnpm --filter @mindfoldhq/trellis build        # tsc + copy-templates
+pnpm --filter @mindfoldhq/trellis typecheck
+pnpm --filter @mindfoldhq/trellis test         # NOTE: 2 pre-existing failures in
+                                               # test/templates/trellis.test.ts (missing
+                                               # marketplace/workflows/{native,tdd}/workflow.md)
+                                               # are UPSTREAM/env, not from this fork.
+# Smoke-test the generated output in a scratch dir:
+d=$(mktemp -d); (cd "$d" && git init -q && node /Users/suool/git/trellis/packages/cli/dist/cli/index.js init --claude -y -u tester)
+# Install for personal use:
+npm i -g 'git+https://github.com/SuooL/Trellis.git#custom'
+```
+When you edit a template that a configurator renders per-platform, remember the **init-write path and the update-collect path must stay byte-identical** (see `.trellis/spec/cli/backend/configurator-shared.md`) or `trellis update` hash-tracking / tests break.
+
+## How this was built (provenance)
+Prototyped & validated first in a separate project (`/Users/suool/git/cc2cx`, "Phase A"), then ported into this fork ("Phase B"). The design decisions, per-item rationale, and the cross-model dogfood-review that caught 4 blockers + 2 majors are written up in **FORK.md**.
+
+---
+
 # CLAUDE.md
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.

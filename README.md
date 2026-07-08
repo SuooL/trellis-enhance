@@ -1,3 +1,16 @@
+<!-- ── PERSONAL FORK NOTICE (custom branch) ──────────────────────────────── -->
+> **⚙️ This is SuooL's personalized fork of Trellis (`custom` branch).**
+> It bakes custom defaults into `trellis init`: model-routed sub-agents (Opus writes / Codex 5.5 reviews),
+> a dual-model adversarial-review capability (`/trellis:question`), extra workflow states
+> (`needs-rework` / `blocked` / `deploying`), and an always-generated Git + GitHub-Actions CI/CD standard.
+>
+> 👉 **Fork background, customization catalog & maintenance:** see **[FORK.md](./FORK.md)** · quick context auto-loads from **[CLAUDE.md](./CLAUDE.md)**.
+> Install: `npm i -g 'git+https://github.com/SuooL/Trellis.git#custom'`
+>
+> _The original upstream README follows unchanged._
+
+<hr/>
+
 <p align="center">
 <picture>
 <source srcset="assets/trellis.png" media="(prefers-color-scheme: dark)">
