@@ -1,0 +1,39 @@
+# Prune merged feature/* branches (weekly).
+#
+# Belt-and-suspenders for `delete_branch_on_merge`: squash-merge creates a new
+# commit on `dev` without the feature branch's commits as ancestors, so an
+# ancestry check (`git branch --merged`) would MISS squash-merged branches.
+# We therefore ask GitHub which PRs are actually MERGED into dev and delete
+# those head branches.
+
+name: Prune merged feature branches
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete feature/* branches whose PR is merged into dev
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh pr list -R "$REPO" --state merged --base dev --json headRefName --limit 200 \
+            | jq -r '.[].headRefName' \
+            | grep -E '^feature/' \
+            | sort -u \
+            | while read -r br; do
+                if gh api -X DELETE "repos/$REPO/git/refs/heads/$br" >/dev/null 2>&1; then
+                  echo "deleted $br"
+                else
+                  echo "skip $br (already gone or protected)"
+                fi
+              done

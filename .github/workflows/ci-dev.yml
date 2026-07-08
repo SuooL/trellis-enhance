@@ -1,0 +1,70 @@
+# CI (dev): verify + auto-merge for PRs into `dev`.
+#
+# trellis-enhance's own git-workflow: feature → PR → dev → (manual) main.
+# This gates dev PRs on typecheck + test + build, then enables GitHub native
+# auto-merge so a green PR merges itself.
+#
+# Auto-merge only actually protects `dev` when the repo has branch protection
+# on `dev` with the "verify" check required + "Allow auto-merge" enabled
+# (both configured via gh api when this workflow was added).
+
+name: CI (dev)
+
+on:
+  pull_request:
+    branches: [dev]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ci-dev-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules — marketplace tests need it)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (core + cli)
+        run: pnpm typecheck
+
+      - name: Test (core + cli)
+        run: pnpm test
+
+      - name: Build (core then cli)
+        run: pnpm build
+
+  auto-merge:
+    name: enable-auto-merge
+    needs: verify
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable PR auto-merge (squash, head-commit pinned)
+        run: gh pr merge --auto --squash --match-head-commit "$HEAD_SHA" "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

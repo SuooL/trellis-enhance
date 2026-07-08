@@ -135,6 +135,8 @@ d=$(mktemp -d); ( cd "$d" && git init -q \
   loses customizations; switch back to `custom` + rebuild to restore.
 - 🔁 Re-link only if the symlink is ever removed: `cd packages/cli && pnpm link --global`. (The
   `@mindfoldhq/trellis → trellis-enhance` rename did not need a relink — the bin symlink resolves by path.)
+- 🪝 **Auto-build hooks (run once per clone):** `sh scripts/setup-dev-hooks.sh` installs local `post-merge` + `post-checkout` hooks that rebuild the CLI automatically after merge/pull/branch-switch **when product source changed** (dogfood-only changes skip). So merges give you the latest features with no reinstall and no manual build.
+- 🤖 **Self-CI (this repo's own git-workflow):** PRs into `dev` are gated by `.github/workflows/ci-dev.yml` (typecheck + test + build) and auto-merged (squash) when green; `delete_branch_on_merge` + the weekly `prune-branches.yml` clean up `feature/*`. `dev` has branch protection requiring the `verify` check. `main` is release-only (manual). The old `.github/workflows/{ci,publish}.yml` are upstream leftovers (publish.yml targets npm, which this fork does not use).
 - ✋ No `npm i -g` for local dev. A from-scratch git-install (`npm i -g 'git+…trellis-enhance.git'`, default branch `main`) is a fallback for
   *other* machines, but note the CLI depends on `@mindfoldhq/trellis-core` via `workspace:*`, so a clean
   external install may need adjustment — the symlink model above is the maintained path.
