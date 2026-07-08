@@ -1126,7 +1126,7 @@ export async function init(options: InitOptions): Promise<void> {
   console.log(chalk.cyan(`\n${banner.trimEnd()}`));
   console.log(
     chalk.gray(
-      "\n   Personalized Trellis — Opus writes, Codex 5.5 reviews, Git/CI baked in\n",
+      "\n   Trellis-Enhance — Opus writes, Codex 5.5 reviews, Git/CI baked in\n",
     ),
   );
 

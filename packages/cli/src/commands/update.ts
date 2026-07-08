@@ -6,7 +6,7 @@ import inquirer from "inquirer";
 
 import { DIR_NAMES, FILE_NAMES, PATHS } from "../constants/paths.js";
 import type { AITool } from "../types/ai-tools.js";
-import { VERSION, PACKAGE_NAME } from "../constants/version.js";
+import { VERSION } from "../constants/version.js";
 import {
   getMigrationsForVersion,
   getAllMigrations,
@@ -1305,18 +1305,10 @@ function getInstalledVersion(cwd: string): string {
  * Fetch latest version from npm registry
  */
 async function getLatestNpmVersion(): Promise<string | null> {
-  try {
-    const response = await fetch(
-      `https://registry.npmjs.org/${PACKAGE_NAME}/latest`,
-    );
-    if (!response.ok) {
-      return null;
-    }
-    const data = (await response.json()) as { version?: string };
-    return data.version ?? null;
-  } catch {
-    return null;
-  }
+  // trellis-enhance fork: self-maintained, not published to npm — do NOT phone
+  // the upstream registry. `trellis update` compares only the local project
+  // version against this CLI's own templates. See FORK.md / CLAUDE.md.
+  return null;
 }
 
 /**

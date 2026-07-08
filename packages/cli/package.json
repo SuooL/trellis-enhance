@@ -1,5 +1,5 @@
 {
-  "name": "@mindfoldhq/trellis",
+  "name": "trellis-enhance",
   "version": "0.6.5",
   "description": "AI capabilities grow like ivy — Trellis provides the structure to guide them along a disciplined path",
   "type": "module",
