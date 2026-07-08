@@ -2,6 +2,10 @@ import path from "node:path";
 
 import { DIR_NAMES, PATHS } from "../constants/paths.js";
 import { copyTrellisDir } from "../templates/extract.js";
+import {
+  gitWorkflowSpec,
+  getGitWorkflowCiFiles,
+} from "../templates/git-workflow/index.js";
 
 // Import trellis templates (generic, not project-specific)
 import {
@@ -119,6 +123,13 @@ export async function createWorkflowStructure(
     configYamlTemplate,
   );
 
+  // Git-workflow standard (always generated). Ships the three-branch spec into
+  // .trellis/spec/tech/ and the CI/deploy/release/prune GitHub Actions into
+  // .github/workflows/. The git_branch.py lifecycle hook (wired in config.yaml)
+  // and this scaffolding are a single cohesive unit; both are written on every
+  // init so branch automation + CI are in place regardless of project type.
+  await createGitWorkflowFiles(cwd);
+
   // Dispatch channel runtime agent definitions. These are platform-agnostic
   // Trellis runtime files consumed by `trellis channel spawn --agent <name>`
   // through `packages/cli/src/commands/channel/agent-loader.ts`. They are
@@ -148,6 +159,28 @@ export async function createWorkflowStructure(
   } else if (!skipSpecTemplates) {
     // Single-repo mode: create global spec (skip if using remote template)
     await createSpecTemplates(cwd, projectType);
+  }
+}
+
+/**
+ * Write the git-workflow standard files (always generated on init).
+ *
+ * - `.trellis/spec/tech/git-workflow.md` — the three-branch / PR-to-dev spec.
+ * - `.github/workflows/{ci,deploy,release,prune-branches}.yml` + `README.md` —
+ *   the CI scaffolding. These are project-agnostic templates (search
+ *   `# CUSTOMIZE`) copied as-is.
+ */
+async function createGitWorkflowFiles(cwd: string): Promise<void> {
+  // Spec doc → .trellis/spec/tech/git-workflow.md
+  const specTechDir = path.join(cwd, DIR_NAMES.WORKFLOW, "spec", "tech");
+  ensureDir(specTechDir);
+  await writeFile(path.join(specTechDir, "git-workflow.md"), gitWorkflowSpec);
+
+  // GitHub Actions workflows → .github/workflows/
+  const workflowsDir = path.join(cwd, ".github", "workflows");
+  ensureDir(workflowsDir);
+  for (const [name, content] of getGitWorkflowCiFiles()) {
+    await writeFile(path.join(workflowsDir, name), content);
   }
 }
 

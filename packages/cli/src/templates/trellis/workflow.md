@@ -240,11 +240,28 @@ Do not dispatch implement/check sub-agents in inline mode.
 Read context: `prd.md` -> `design.md if present` -> `implement.md if present`, plus relevant spec/research loaded by skills.
 [/workflow-state:in_progress-inline]
 
+<!-- Custom states (local fork). Writer: `task.py set-status <dir> <status>`.
+     Additive blocks — keep them separate from upstream blocks so `trellis update`
+     merges cleanly. Each has a matching route in continue.md Step 3. -->
+
+[workflow-state:needs-rework]
+`trellis-check` found issues that need re-implementation. Return to Phase 2.1: dispatch `trellis-implement` (or fix inline) to address the findings from the last check run, then re-run `trellis-check`. Do NOT commit while in this state. When check passes, resume: `python3 ./.trellis/scripts/task.py set-status <task-dir> in_progress`.
+[/workflow-state:needs-rework]
+
+[workflow-state:blocked]
+Task is paused on an external dependency or a pending decision. State the blocker and its unblock condition in user-facing text and record it in the task's `prd.md` / notes. Do NOT continue implementation while blocked. When the blocker clears, resume: `python3 ./.trellis/scripts/task.py set-status <task-dir> in_progress`.
+[/workflow-state:blocked]
+
+[workflow-state:deploying]
+Code is committed and (under the git-workflow standard) the PR to `dev` is open — this task is tracking the post-merge deploy/release. CI on the PR to `dev` runs build + tests + the diff-coverage gate and auto-merges on green; merging `dev` triggers the production deploy (`.github/workflows/deploy.yml`, per-project opt-in). Verify the deploy and record the outcome (commit / PR / release link) in the task. When the deploy is confirmed, run `/trellis:finish-work` to archive (or set another status your process requires).
+[/workflow-state:deploying]
+
 ### Phase 3: Finish
 - 3.2 Debug retrospective `[on demand]`
 - 3.3 Spec update `[required · once]`
 - 3.4 Commit changes `[required · once]`
-- 3.5 Wrap-up reminder
+- 3.5 Open PR to dev `[required · once]` — when the project uses the git-workflow standard
+- 3.6 Wrap-up reminder
 
 > Note: step 3.1 was folded into 2.2 (last-iteration full-scope check) and 3.4 (commit preamble). Numbering kept stable to avoid breaking external references.
 
@@ -277,6 +294,7 @@ When a user request matches one of these intents inside an active task, route fi
 - Planning or unclear requirements -> `trellis-brainstorm`.
 - `in_progress` implementation/check -> dispatch `trellis-implement` / `trellis-check`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
+- Critical / adversarial review of a plan, design, code, or question -> `trellis-adversarial-review` (or `/trellis:question`).
 
 [/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, ZCode, Reasonix, Trae]
 
@@ -285,6 +303,7 @@ When a user request matches one of these intents inside an active task, route fi
 - Planning or unclear requirements -> `trellis-brainstorm`.
 - Before editing -> `trellis-before-dev`; after editing -> `trellis-check`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
+- Critical / adversarial review of a plan, design, code, or question -> `trellis-adversarial-review` (or `/trellis:question`).
 
 [/codex-inline, Kilo, Antigravity, Devin]
 
@@ -637,7 +656,26 @@ The AI drives a batched commit of this task's code changes so `/finish-work` can
 - If the user wants different message wording but accepts the file grouping, edit the message and re-confirm once — but if they reject the grouping, exit to manual mode.
 - The batched plan is one prompt; do not prompt per commit.
 
-#### 3.5 Wrap-up reminder
+#### 3.5 Open PR to dev `[required · once]`
+
+*Applies when the project follows the git-workflow standard (`.trellis/spec/tech/git-workflow.md`). Skip for projects that don't use PR-to-dev.*
+
+Once the work is committed on the `feature/<task-slug>` branch, open the PR targeting the integration branch:
+
+```bash
+python3 ./.trellis/scripts/task.py set-base-branch <task-dir> dev
+python3 ./.trellis/scripts/task.py create-pr
+```
+
+CI runs on the PR to `dev` (build + tests + diff-coverage ≥ 80% hard gate) and auto-merges on green; the merge into `dev` triggers the production deploy (per-project opt-in). To track that post-merge deploy/release explicitly, set the task to the deploying state:
+
+```bash
+python3 ./.trellis/scripts/task.py set-status <task-dir> deploying
+```
+
+This switches the breadcrumb to `[workflow-state:deploying]`; when the deploy is confirmed, proceed to wrap-up.
+
+#### 3.6 Wrap-up reminder
 
 After the above, remind the user they can run `/finish-work` to wrap up (archive the task, record the session).
 

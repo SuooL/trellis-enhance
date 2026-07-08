@@ -1,0 +1,102 @@
+# CI: verify + auto-merge on PRs to `dev`.
+#
+# Gates a PR into `dev` on build + tests + a diff-coverage hard gate (>= 80%
+# of the lines this PR adds/changes must be covered). On green, it enables
+# GitHub native auto-merge so the PR merges once all required checks pass.
+#
+# IMPORTANT: auto-merge only actually protects `dev` if the repo has
+# BRANCH PROTECTION on `dev` with THIS job's check ("verify") set as a
+# REQUIRED status check, plus "Allow auto-merge" enabled in repo settings.
+# Without required checks, auto-merge would merge without waiting for CI.
+# See .github/workflows/README.md.
+#
+# Placeholders marked "# CUSTOMIZE" are where each project plugs in its own
+# build/test/coverage commands (defaults assume a Node project).
+
+name: CI
+
+on:
+  pull_request:
+    branches: [dev]
+    # Include ready_for_review so a draft PR marked ready re-triggers CI (and
+    # therefore auto-merge) without needing an extra push. Defaults would
+    # otherwise be [opened, synchronize, reopened].
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Least-privilege by default; auto-merge needs PR write.
+permissions:
+  contents: read
+  pull-requests: write
+
+# Cancel superseded runs on the same PR.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so diff-coverage can diff against the base branch.
+          fetch-depth: 0
+
+      # --- Toolchain setup (CUSTOMIZE for your stack) --------------------------
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci # CUSTOMIZE: e.g. `pip install -r requirements.txt`
+
+      # --- Build ---------------------------------------------------------------
+      - name: Build
+        run: npm run build # CUSTOMIZE: your project's build command
+
+      # --- Tests (with coverage) ----------------------------------------------
+      # Emit a coverage report your diff-coverage tool can read (Cobertura /
+      # lcov are widely supported). For JS: jest/vitest with a cobertura
+      # reporter (which writes coverage/cobertura-coverage.xml by default —
+      # keep this in sync with the path read below); for Python:
+      # `pytest --cov --cov-report=xml` (writes coverage.xml by default).
+      - name: Test
+        run: npm test -- --coverage --coverageReporters=cobertura # CUSTOMIZE
+
+      # --- Diff-coverage hard gate (>= 80%) -----------------------------------
+      # Fails the job if patch coverage (lines added/changed by this PR) is
+      # below the threshold. `diff-cover` reads a Cobertura/lcov report and the
+      # git diff against the base branch. Swap for your language's equivalent
+      # (e.g. Codecov patch status, `undercover`, etc.).
+      # NOTE: the report path here MUST match your test step's output path
+      # above. Default assumes Jest's cobertura reporter, which writes
+      # coverage/cobertura-coverage.xml (not coverage.cobertura.xml).
+      - name: Diff coverage gate
+        run: |
+          python3 -m pip install --quiet diff-cover
+          diff-cover coverage/cobertura-coverage.xml \
+            --compare-branch origin/${{ github.base_ref }} \
+            --fail-under=80   # CUSTOMIZE: threshold (locked default = 80)
+
+  auto-merge:
+    name: enable-auto-merge
+    needs: verify
+    runs-on: ubuntu-latest
+    # Don't auto-merge draft PRs.
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # --match-head-commit pins the merge to the exact commit that just
+      # passed `verify`. Without it, a commit pushed between `verify`
+      # finishing and this step running could be the one that actually
+      # merges once checks re-run and pass on it — never on an unverified sha.
+      - name: Enable PR auto-merge
+        run: gh pr merge --auto --squash --match-head-commit "$HEAD_SHA" "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

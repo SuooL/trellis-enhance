@@ -1,0 +1,94 @@
+# Deploy: continuous deploy to production on push to `dev`.
+#
+# Fires when `dev` is updated (i.e. after a feature PR auto-merges). Guarded by
+# a repo variable so deploy is OPT-IN per project: set repo variable
+# DEPLOY_ENABLED=true to turn it on. Deploys via SSH/rsync to a cloud server.
+#
+# Required repo SECRETS:
+#   DEPLOY_HOST  - server hostname or IP
+#   DEPLOY_USER  - SSH user
+#   DEPLOY_KEY   - private SSH key (PEM) for that user
+#   DEPLOY_PATH  - absolute target directory on the server
+# Required repo VARIABLE:
+#   DEPLOY_ENABLED - "true" to enable this workflow
+#
+# Placeholders marked "# CUSTOMIZE" are where each project plugs in its build,
+# artifact path, and service restart.
+
+name: Deploy
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: deploy-production
+    runs-on: ubuntu-latest
+    # Per-project switch: skip entirely unless explicitly enabled.
+    if: vars.DEPLOY_ENABLED == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Build (CUSTOMIZE for your stack) -----------------------------------
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci # CUSTOMIZE
+
+      - name: Build
+        run: npm run build # CUSTOMIZE: produce the artifact to ship (e.g. ./dist)
+
+      # --- Load SSH key -------------------------------------------------------
+      # Secrets are passed through `env:` and referenced as shell variables
+      # (never interpolated as ${{ }} directly into the script) so that
+      # special characters in a secret's value can't be re-parsed as shell
+      # syntax.
+      - name: Configure SSH
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          SSH_DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      # --- Sync artifact to the server ----------------------------------------
+      - name: Rsync deploy
+        env:
+          SSH_DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            ./dist/ \
+            "${SSH_DEPLOY_USER}@${SSH_DEPLOY_HOST}:${SSH_DEPLOY_PATH}/"
+          # CUSTOMIZE: source path (./dist/) must match your build output.
+
+      # --- Restart the service ------------------------------------------------
+      - name: Restart service
+        env:
+          SSH_DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          SSH_DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            "${SSH_DEPLOY_USER}@${SSH_DEPLOY_HOST}" \
+            "sudo systemctl restart my-service"
+          # CUSTOMIZE: your restart command (systemctl / pm2 reload / docker compose up -d / ...).
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

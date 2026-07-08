@@ -253,6 +253,10 @@ const SKILL_DESCRIPTIONS: Record<string, string> = {
     "Deep bug analysis to break the fix-forget-repeat cycle. Analyzes root cause category, why fixes failed, prevention mechanisms, and captures knowledge into specs. Use after fixing a bug to prevent the same class of bugs.",
   "update-spec":
     "Captures executable contracts and coding conventions into .trellis/spec/ documents. Use when learning something valuable from debugging, implementing, or discussion that should be preserved for future sessions.",
+  "adversarial-review":
+    "Multi-role, dual-model adversarial + constructive review of any project content, plan, design, or question. Independent expert panels run on Opus 4.8 AND Codex GPT-5.5, then divergences are contrasted. Use when the user asks for 对抗性审查 / 批判性审查 / adversarial review / red-team / critical review / 让专家评审 / 找出方案(或代码/设计)的缺陷 / a second independent opinion, or explicitly invokes /trellis:question.",
+  question:
+    "Explicit entry point for a multi-role, dual-model adversarial + constructive review of a plan, design, code, doc, or open question. Loads the trellis-adversarial-review skill and runs two independent expert panels (Opus 4.8 + Codex GPT-5.5), contrasts the divergences, and persists a report. Use when the user wants a critical second opinion or invokes /trellis:question.",
 };
 
 /**
@@ -283,6 +287,8 @@ const COMMAND_DESCRIPTIONS: Record<string, string> = {
   continue: "Resume work on the current task at the correct phase.",
   "finish-work":
     "Wrap up the current session: quality gate, commit reminder, archive, journal.",
+  question:
+    "Run a multi-role, dual-model adversarial review of a plan, design, code, or question.",
 };
 
 /** Wrap resolved command content with YAML frontmatter (name + description). */
