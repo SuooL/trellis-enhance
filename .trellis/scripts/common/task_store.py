@@ -128,6 +128,8 @@ _SUBAGENT_CONFIG_DIRS: tuple[str, ...] = (
     ".factory",   # Factory Droid
     ".github/copilot",
     ".pi",        # Pi Agent
+    ".trae",      # Trae IDE
+    ".zcode",     # ZCode
 )
 
 _SEED_EXAMPLE = (
@@ -771,4 +773,71 @@ def cmd_set_scope(args: argparse.Namespace) -> int:
     write_json(task_json, data)
 
     print(colored(f"✓ Scope set to: {scope}", Colors.GREEN))
+    return 0
+
+
+# =============================================================================
+# Command: set-status
+# =============================================================================
+
+# Known workflow statuses. Custom statuses (e.g. needs-rework, blocked,
+# deploying) are allowed too — this list only drives a friendly hint, not a
+# hard gate, so forks can add their own states without editing this file.
+KNOWN_STATUSES = {
+    "planning",
+    "in_progress",
+    "needs-rework",
+    "blocked",
+    "deploying",
+    "completed",
+    "rejected",
+}
+
+
+def cmd_set_status(args: argparse.Namespace) -> int:
+    """Set task.json.status to an arbitrary workflow status.
+
+    This is the writer primitive for custom workflow states. The per-turn
+    workflow-state breadcrumb (inject-workflow-state.py) reads task.json.status
+    and injects the matching [workflow-state:<status>] block from workflow.md,
+    so a status has no effect until a [workflow-state:<status>] block exists.
+    """
+    repo_root = get_repo_root()
+    target_dir = resolve_task_dir(args.dir, repo_root)
+    status = args.status
+
+    if not status:
+        print(colored("Error: Missing arguments", Colors.RED))
+        print("Usage: python3 task.py set-status <task-dir> <status>")
+        return 1
+
+    # STATUS charset contract (workflow-state-contract): [A-Za-z0-9_-]+
+    if not status or not all(c.isalnum() or c in "-_" for c in status):
+        print(colored(
+            f"Error: invalid status '{status}'. Allowed charset: letters, digits, '-', '_'.",
+            Colors.RED,
+        ))
+        return 1
+
+    task_json = target_dir / FILE_TASK_JSON
+    if not task_json.is_file():
+        print(colored(f"Error: task.json not found at {target_dir}", Colors.RED))
+        return 1
+
+    data = read_json(task_json)
+    if not data:
+        return 1
+
+    prev = data.get("status", "unknown")
+    data["status"] = status
+    write_json(task_json, data)
+
+    print(colored(f"✓ Status: {prev} → {status}", Colors.GREEN))
+    if status not in KNOWN_STATUSES:
+        print(colored(
+            f"  Note: '{status}' is a custom status — ensure a "
+            f"[workflow-state:{status}] block exists in .trellis/workflow.md "
+            f"and a route in continue.md, or the breadcrumb won't fire.",
+            Colors.YELLOW,
+        ))
     return 0

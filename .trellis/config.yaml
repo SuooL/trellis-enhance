@@ -50,6 +50,16 @@ max_journal_lines: 2000
 #   after_archive:
 #     - "echo 'Task archived'"
 
+# Git three-branch workflow (see .trellis/spec/tech/git-workflow.md):
+#   after_create  → create feature/<task-slug> (safe-skip on non-git repos)
+#   after_archive → delete the local feature branch once merged into dev
+# git_branch.py never fails the lifecycle event; it warns and exits 0 on skip.
+hooks:
+  after_create:
+    - "python3 .trellis/scripts/hooks/git_branch.py create"
+  after_archive:
+    - "python3 .trellis/scripts/hooks/git_branch.py cleanup"
+
 #-------------------------------------------------------------------------------
 # Monorepo / Packages
 #-------------------------------------------------------------------------------
@@ -72,17 +82,9 @@ max_journal_lines: 2000
 #   webapp:
 #     path: ./webapp
 #     git: true
-packages:
-  cli:
-    path: packages/cli
-  core:
-    path: packages/core
-  docs-site:
-    path: docs-site
-    type: submodule
 
 # Default package used when --package is not specified.
-default_package: cli
+# default_package: frontend
 
 #-------------------------------------------------------------------------------
 # Channel worker OOM guard

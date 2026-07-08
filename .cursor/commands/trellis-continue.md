@@ -31,6 +31,9 @@ Shows the Phase Index (Plan / Execute / Finish) with routing + skill mapping.
 - `status=in_progress` + implementation not started → **2.1**
 - `status=in_progress` + implementation done, not yet checked → **2.2**
 - `status=in_progress` + check passed → **3.3** (spec update) → **3.4** (commit)
+- `status=needs-rework` → back to **2.1** (re-implement to address the last `trellis-check` findings, then re-check; on green run `task.py set-status <dir> in_progress`)
+- `status=blocked` → do NOT implement; confirm the blocker/unblock condition with the user; when cleared run `task.py set-status <dir> in_progress` and resume at the appropriate Phase 2/3 step
+- `status=deploying` → follow the project's deploy/release steps (see Phase 3.5), verify, record the outcome, then `/trellis-finish-work`
 - `status=completed` (rare; usually archived immediately) → archive flow
 
 Phase rules (full detail in `.trellis/workflow.md`):

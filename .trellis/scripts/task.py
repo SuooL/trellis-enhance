@@ -53,6 +53,7 @@ from common.task_store import (
     cmd_set_branch,
     cmd_set_base_branch,
     cmd_set_scope,
+    cmd_set_status,
     cmd_add_subtask,
     cmd_remove_subtask,
 )
@@ -441,6 +442,11 @@ def main() -> int:
     p_scope.add_argument("dir", help="Task directory")
     p_scope.add_argument("scope", help="Scope name")
 
+    # set-status (writer for custom workflow states)
+    p_status = subparsers.add_parser("set-status", help="Set task status (custom workflow states)")
+    p_status.add_argument("dir", help="Task directory")
+    p_status.add_argument("status", help="Status name (e.g. needs-rework, blocked, deploying)")
+
     # archive
     p_archive = subparsers.add_parser("archive", help="Archive task")
     p_archive.add_argument("name", help="Task directory or name")
@@ -482,6 +488,7 @@ def main() -> int:
         "set-branch": cmd_set_branch,
         "set-base-branch": cmd_set_base_branch,
         "set-scope": cmd_set_scope,
+        "set-status": cmd_set_status,
         "archive": cmd_archive,
         "add-subtask": cmd_add_subtask,
         "remove-subtask": cmd_remove_subtask,
