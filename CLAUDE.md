@@ -1,10 +1,9 @@
 <!-- ═══════════════════════════════════════════════════════════════════════
-     PERSONAL FORK CONTEXT (branch: custom) — read this first.
-     This block is fork-only; it lives on `custom`, not on `main`.
-     For the full story see FORK.md.
+     TRELLIS-ENHANCE CONTEXT — read this first.
+     Lives on the working line (main / dev). For the full story see FORK.md.
      ═══════════════════════════════════════════════════════════════════════ -->
 
-# Trellis-Enhance — SuooL's self-maintained fork (`custom` branch)
+# Trellis-Enhance — SuooL's self-maintained Trellis (branches: `main` / `dev` / `feature`)
 
 This repo is **`trellis-enhance`** — SuooL's own, self-maintained product, forked from Trellis
 (`mindfold-ai/Trellis`). The npm package is renamed to **`trellis-enhance`** (bins stay `trellis` / `tl`);
@@ -16,10 +15,11 @@ generates them into any target project.
 an adversarial-review capability, and a Git/CI standard — baked into every `trellis init`. Self-owned:
 `trellis update` refreshes a project purely from THIS CLI's templates; no upstream version check.
 
-## Branch model (important)
-- **`custom`** — all my customizations live here. Ship/install from this branch. **You are normally on `custom`.**
-- **`main`** — kept as a clean mirror of upstream, for comparison only. Do NOT put customizations here.
-- **`upstream`** remote = `mindfold-ai/trellis`. Maintenance = periodically `git fetch upstream`, compare (`git diff upstream/main custom -- <paths>`), and cherry-pick/merge upstream changes into `custom` when worthwhile. Upstream-sync is NOT a hard constraint — reconcile manually when needed.
+## Branch model (this repo follows trellis-enhance's own git-workflow standard)
+- **`main`** — the product / release line. **Default branch.**
+- **`dev`** — integration branch; feature work lands here first.
+- **`feature/<task-slug>`** — per-task development. The `git_branch.py` hook creates these off `dev`; flow is `feature` → PR → `dev` → `main`.
+- **`upstream`** remote = `mindfold-ai/trellis` — kept **only** for occasional manual comparison: `git fetch upstream && git diff upstream/main main -- <paths>`, cherry-pick what's worthwhile. Not auto-tracked/merged. (This repo is standalone, no longer a GitHub fork.)
 
 ## What's customized (all in `packages/cli/src/templates/…` + `…/configurators/`)
 | Area | What | Key files |
@@ -38,12 +38,12 @@ So the global command runs **whatever is currently built in this working tree**.
 
 **The dev loop (no reinstall, ever):**
 ```bash
-cd /Users/suool/git/Trellis            # stay on the `custom` branch
+cd /Users/suool/git/Trellis            # work on a feature/* branch (or dev); merge to main per the standard
 # ...edit source under packages/cli/src/...
 pnpm --filter trellis-enhance build    # tsc + copy-templates → dist/ ; global `trellis` is now updated
 ```
 - ✅ **Editing + `build` is all it takes** — the symlink means the change is live immediately. No `npm i -g`.
-- ⚠️ The global command = **"whatever branch is checked out here + last build"**. If you ever `git checkout main` (to compare upstream) **and build there**, the global CLI temporarily loses the customizations. Switch back to `custom` and rebuild to restore.
+- ⚠️ The global command = **"whatever branch is checked out here + last build"**. After switching branches (`main` / `dev` / `feature/*`), rebuild so the global CLI reflects that branch's code.
 - 🔁 Only re-link if the symlink itself is ever removed: `cd packages/cli && pnpm link --global` (or `npm link`). After the `@mindfoldhq/trellis → trellis-enhance` rename the existing bin symlink still resolves by path, so no relink was needed.
 
 **Self-owned updates:** `trellis update` in a project refreshes its `.trellis/` from THIS CLI's templates only. The upstream-npm version check was removed (`getLatestNpmVersion()` returns null) — it never phones `registry.npmjs.org`.

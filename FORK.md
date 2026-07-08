@@ -17,7 +17,7 @@ wanted **my own opinionated defaults** to be what `trellis init` produces — wi
 every project by hand.
 
 This fork changes the **CLI's templates + configurators** (`packages/cli/src/…`), so the built CLI
-generates my customized workflow into every project I init. Install once from the `custom` branch,
+generates my customized workflow into every project I init. Install once,
 then `trellis init` anywhere gets:
 
 - model-routed sub-agents (Opus writes, Codex reviews),
@@ -27,30 +27,33 @@ then `trellis init` anywhere gets:
 
 ## 2. Branch & remote model
 
+This repo is **standalone** (not a GitHub fork) and follows trellis-enhance's own git-workflow standard:
+
 | Branch / remote | Role |
 |---|---|
-| `custom` (origin) | **All customizations.** Install & work from here. |
-| `main` (origin) | Clean mirror of upstream — for comparison only, never customized. |
-| `upstream` = `mindfold-ai/trellis` | Compare against / pull from official. |
+| `main` (origin) | Product / release line. **Default branch.** |
+| `dev` (origin) | Integration branch — feature work lands here first. |
+| `feature/<task-slug>` | Per-task development (created off `dev` by the `git_branch.py` hook). Flow: `feature` → PR → `dev` → `main`. |
+| `upstream` = `mindfold-ai/trellis` | Kept only for occasional manual comparison. |
 
 **Install (personal use):**
 ```bash
-npm i -g 'git+https://github.com/SuooL/trellis-enhance.git#custom'
+npm i -g 'git+https://github.com/SuooL/trellis-enhance.git'   # installs the default branch (main)
 ```
+(For local dev the symlink model in §4 is the maintained path — no reinstall.)
 
-**Maintenance (follow upstream when I want):**
+**Compare with upstream when I want (manual, not automatic):**
 ```bash
 git fetch upstream
-git log --oneline main..upstream/main          # what's new upstream
-git diff upstream/main custom -- packages/cli/src/templates  # how my changes overlap
-# then merge/cherry-pick into custom as desired; upstream-sync is manual, not automatic.
-git checkout main && git merge --ff-only upstream/main && git push origin main  # refresh the mirror
+git log --oneline upstream/main ^main                     # commits upstream has that main doesn't
+git diff upstream/main main -- packages/cli/src/templates  # how my defaults differ from upstream
+# cherry-pick anything worthwhile onto a feature branch → dev → main.
 ```
 
 ## 3. Customizations (the catalog)
 
 Everything lives under `packages/cli/src/templates/…` (+ two configurator files). The list of
-changed files vs `main` is the source of truth: `git diff --name-status main custom`.
+changed files vs upstream is the source of truth: `git fetch upstream && git diff --name-status upstream/main main`.
 
 ### 3.1 Sub-agent model routing
 - **implement = Opus 4.8** — strongest coder writes the code. (`templates/claude/agents/trellis-implement.md`, `model: opus`)
@@ -115,7 +118,7 @@ this repo's build (`/opt/homebrew/bin/trellis → …/packages/cli`), so it runs
 here. The dev loop is just edit → build:
 
 ```bash
-cd /Users/suool/git/Trellis                   # stay on `custom`
+cd /Users/suool/git/Trellis                   # on a feature/* branch (or dev)
 # ...edit packages/cli/src/...
 pnpm --filter trellis-enhance build           # tsc + copy-templates → dist/ ; global `trellis` now updated
 pnpm --filter trellis-enhance typecheck
@@ -132,7 +135,7 @@ d=$(mktemp -d); ( cd "$d" && git init -q \
   loses customizations; switch back to `custom` + rebuild to restore.
 - 🔁 Re-link only if the symlink is ever removed: `cd packages/cli && pnpm link --global`. (The
   `@mindfoldhq/trellis → trellis-enhance` rename did not need a relink — the bin symlink resolves by path.)
-- ✋ No `npm i -g` for local dev. A from-scratch git-install (`npm i -g 'git+…#custom'`) is a fallback for
+- ✋ No `npm i -g` for local dev. A from-scratch git-install (`npm i -g 'git+…trellis-enhance.git'`, default branch `main`) is a fallback for
   *other* machines, but note the CLI depends on `@mindfoldhq/trellis-core` via `workspace:*`, so a clean
   external install may need adjustment — the symlink model above is the maintained path.
 
@@ -156,7 +159,7 @@ else (1298 tests) passes.
 
 ## 6. Gotchas for future me
 
-- Working on customizations? You should be on **`custom`**. Never commit customizations to `main`.
+- Working on trellis-enhance? Do it on a **`feature/*`** branch → PR to **`dev`** → **`main`** (its own git-workflow standard). Don't commit straight to `main`.
 - Adding a new common skill → **register its description in `SKILL_DESCRIPTIONS` (shared.ts)** or the build throws.
 - Adding a custom state → wire **all three** places (workflow.md block + continue.md route + a status writer).
 - Editing a per-platform-rendered template → keep the init-write and update-collect paths byte-identical (`configurator-shared.md`).

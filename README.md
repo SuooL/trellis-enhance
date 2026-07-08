@@ -1,5 +1,5 @@
-<!-- ── PERSONAL FORK NOTICE (custom branch) ──────────────────────────────── -->
-> **⚙️ Trellis-Enhance** — SuooL's self-maintained fork of Trellis (package renamed `trellis-enhance`, on the `custom` branch; command stays `trellis` / `tl`).
+<!-- ── TRELLIS-ENHANCE NOTICE ─────────────────────────────────────────────── -->
+> **⚙️ Trellis-Enhance** — SuooL's self-maintained Trellis (standalone repo, package `trellis-enhance`; branches `main` / `dev` / `feature`; command stays `trellis` / `tl`).
 > It bakes custom defaults into `trellis init`: model-routed sub-agents (Opus writes / Codex 5.5 reviews),
 > a dual-model adversarial-review capability (`/trellis:question`), extra workflow states
 > (`needs-rework` / `blocked` / `deploying`), and an always-generated Git + GitHub-Actions CI/CD standard.
