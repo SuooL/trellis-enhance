@@ -35,7 +35,7 @@ then `trellis init` anywhere gets:
 
 **Install (personal use):**
 ```bash
-npm i -g 'git+https://github.com/SuooL/Trellis.git#custom'
+npm i -g 'git+https://github.com/SuooL/trellis-enhance.git#custom'
 ```
 
 **Maintenance (follow upstream when I want):**
