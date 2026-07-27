@@ -239,21 +239,7 @@ ${context}
 
 ## Your Task
 
-${originalPrompt}
-
----
-
-## Workflow
-
-1. **Get changes** - Run \`git diff --name-only\` and \`git diff\`
-2. **Check against specs** - Check item by item
-3. **Self-fix** - Fix issues directly, don't just report
-4. **Run verification** - Run lint and typecheck
-
-## Important Constraints
-
-- Fix issues yourself, don't just report
-- Must execute complete checklist`,
+${originalPrompt}`,
 
     research: `<!-- trellis-hook-injected -->
 # Research Agent Task
