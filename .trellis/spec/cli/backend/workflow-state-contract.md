@@ -266,6 +266,14 @@ nested Trellis sub-agents.
   markers outside those tags are runtime input too.
 - Add a writer-table row to this spec when introducing a new status writer.
 - Run the regression tests after editing breadcrumb bodies.
+- Expect to update test assertions when you reword workflow.md. Several
+  regression tests pin **whole sentences verbatim** (e.g. the `[#292]` JSONL
+  ready-gate test asserts the exact gate sentence, the planning-breadcrumb
+  test asserts its exact jsonl clause). Grep the sentence you are changing
+  before editing. When a pinned sentence is *scoped* rather than removed,
+  keep the test and re-pin both halves — the tightened case and the newly
+  exempt one — so the original guarantee is not silently dropped along with
+  the wording.
 - When adding a `[required · once]` step to the workflow walkthrough, add a
   matching enforcement line to that phase's breadcrumb tag block in the
   same commit.
