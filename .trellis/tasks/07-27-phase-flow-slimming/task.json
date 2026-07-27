@@ -13,7 +13,7 @@
   "createdAt": "2026-07-27",
   "completedAt": null,
   "branch": "feature/phase-flow-slimming",
-  "base_branch": "feature/workflow-friction-reduction",
+  "base_branch": "dev",
   "worktree_path": null,
   "commit": null,
   "pr_url": null,
