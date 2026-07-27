@@ -652,7 +652,7 @@ The AI drives a batched commit of this task's code changes so `/finish-work` can
 
 **Rules**:
 - No `git commit --amend` anywhere — three-stage three-commit flow (work commits → archive commit → journal commit).
-- Never push to remote in this step.
+- Never push to remote in this step — the push belongs to 3.5 (`task.py create-pr`).
 - If the user wants different message wording but accepts the file grouping, edit the message and re-confirm once — but if they reject the grouping, exit to manual mode.
 - The batched plan is one prompt; do not prompt per commit.
 
@@ -663,9 +663,12 @@ The AI drives a batched commit of this task's code changes so `/finish-work` can
 Once the work is committed on the `feature/<task-slug>` branch, open the PR targeting the integration branch:
 
 ```bash
-python3 ./.trellis/scripts/task.py set-base-branch <task-dir> dev
-python3 ./.trellis/scripts/task.py create-pr
+python3 ./.trellis/scripts/task.py create-pr            # add --dry-run to preview
 ```
+
+**`create-pr` owns the push.** Step 3.4 forbids pushing during the commit batch; this step is where the branch reaches the remote. `create-pr` runs `git push -u origin <branch>` and then opens the PR, so there is no separate manual push step. It reads `branch` and `base_branch` from `task.json` — the `after_create` hook already set `base_branch` to `dev`, so `set-base-branch` is only needed when targeting something else.
+
+If `gh` is missing or unauthenticated, `create-pr` prints the equivalent commands to run by hand instead of failing silently.
 
 CI runs on the PR to `dev` (build + tests + diff-coverage ≥ 80% hard gate) and auto-merges on green; the merge into `dev` triggers the production deploy (per-project opt-in). To track that post-merge deploy/release explicitly, set the task to the deploying state:
 

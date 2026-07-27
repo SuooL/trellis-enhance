@@ -91,7 +91,9 @@ Before opening / finalizing the PR to `dev`, verify:
 | No direct pushes | Nothing was pushed straight to `dev` / `main`. |
 | Scope | Only files required by this task changed. |
 
-When all pass, open the PR (`task.py create-pr`). CI runs on the PR to `dev`; on
+When all pass, open the PR with `task.py create-pr` (`--dry-run` previews it).
+That command pushes the branch and opens the PR in one step — it is the only
+point in the workflow where a push happens. CI runs on the PR to `dev`; on
 green it auto-merges, the branch is deleted, and `dev` deploys to production
 (if the project enabled deploy).
 
