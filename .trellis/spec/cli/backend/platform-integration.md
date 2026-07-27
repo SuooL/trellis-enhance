@@ -69,6 +69,40 @@ When adding a new platform `{platform}`, update the following:
 >
 > Trae follows this shared-hook template pattern but writes `.trae/hooks.json`, `.trae/commands/trellis-*.md` with command frontmatter, `.trae/skills/`, `.trae/agents/`, and `.trae/hooks/`. Its main session uses `SessionStart` / `UserPromptSubmit` hooks; sub-agent context remains class-2 pull-based because Trae does not expose a Trellis-supported sub-agent prompt mutation surface.
 
+### Contract: shared hooks inject context, agent definitions own workflow
+
+A `shared-hooks/*.py` prompt builder may inject **context** (spec files, task
+artifacts, the original prompt). It must **not** prescribe the agent's
+**workflow** — no numbered steps, no "run lint then typecheck", no
+"check item by item".
+
+Why: one shared hook feeds several platforms whose agent definitions
+legitimately differ. `inject-subagent-context.py` is copied into 5 platforms
+(claude / cursor / codebuddy / droid / kiro, per `SHARED_HOOKS_BY_PLATFORM` in
+`src/templates/shared-hooks/index.ts`). Claude's `trellis-check` delegates the
+review to a cross-model reviewer; the other four self-review natively. A
+workflow hardcoded in the shared hook therefore lands in the same prompt as a
+contradictory one from the agent definition, and the agent may run both.
+
+This actually shipped: `build_check_prompt()` injected "Check item by item
+against specs" plus "Pay special attention to impact radius analysis (L1-L5)"
+— the latter undefined anywhere in the repo since the initial commit — while
+`claude/agents/trellis-check.md` instructed delegation to Codex. Fixed
+2026-07-27 by stripping the `## Workflow` / `## Important Constraints` sections
+from the check builder.
+
+Before adding instructions to a shared prompt builder, ask: *would this be
+wrong for any platform that receives it?* If yes, it belongs in that platform's
+agent definition instead.
+
+Keep the `<!-- trellis-hook-injected -->` marker — agent definitions branch on
+its presence to decide whether to self-load context (see
+`claude/agents/trellis-check.md`, "Trellis Context Loading Protocol").
+
+`opencode/plugins/inject-subagent-context.js` is an independent JS
+reimplementation of the same hook. Changes to the Python builders must be
+mirrored there or the twins drift.
+
 **Claude Code pattern** (full hooks + agents + settings):
 
 | Directory                            | Contents                                                     |
