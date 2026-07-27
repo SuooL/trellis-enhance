@@ -5554,10 +5554,10 @@ describe("regression: copilot agents use YAML tools frontmatter", () => {
 
   it("maps research agent MCP tools to Copilot tool names", () => {
     // research is the one agent that legitimately needs external search.
-    // Its source uses the wildcard `mcp__*` (avoids the explicit-name
-    // silent-skip, opts into any MCP the user has configured) and the
-    // Copilot transformer maps that wildcard to the full set of supported
-    // Copilot MCP tool equivalents.
+    // Its source names MCP servers explicitly — a bare `mcp__*` wildcard was
+    // measured (2026-07-27) to match nothing, leaving the agent with zero MCP
+    // tools. The Copilot transformer maps those explicit names onto Copilot's
+    // own external-tool vocabulary.
     const content = fs.readFileSync(
       path.join(tmpDir, ".github/agents/trellis-research.agent.md"),
       "utf-8",

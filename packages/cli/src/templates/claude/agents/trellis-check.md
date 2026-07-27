@@ -2,7 +2,7 @@
 name: trellis-check
 description: |
   Code quality check expert. Reviews code changes against specs by delegating the review reasoning to an independent cross-model reviewer (Codex GPT-5.5), then self-fixes issues.
-tools: Read, Write, Edit, Bash, Glob, Grep, mcp__*
+tools: Read, Write, Edit, Bash, Glob, Grep, mcp__codex__codex, mcp__codex__codex-reply
 model: sonnet
 ---
 # Check Agent (Cross-model review — Design 1)
