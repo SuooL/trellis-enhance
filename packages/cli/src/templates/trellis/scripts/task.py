@@ -56,6 +56,7 @@ from common.task_store import (
     cmd_set_status,
     cmd_add_subtask,
     cmd_remove_subtask,
+    cmd_create_pr,
 )
 from common.task_context import (
     cmd_add_context,
@@ -322,6 +323,7 @@ Usage:
   python3 task.py remove-subtask <parent> <child>    Unlink child from parent
   python3 task.py list [--mine] [--status <status>]  List tasks
   python3 task.py list-archive [YYYY-MM]             List archived tasks
+  python3 task.py create-pr [dir] [--dry-run]        Push branch and open PR
 
 Monorepo options:
   --package <pkg>      Package name (validated against config.yaml packages)
@@ -471,6 +473,15 @@ def main() -> int:
     p_listarch = subparsers.add_parser("list-archive", help="List archived tasks")
     p_listarch.add_argument("month", nargs="?", help="Month (YYYY-MM)")
 
+    # create-pr
+    p_create_pr = subparsers.add_parser("create-pr", help="Push task branch and open its PR")
+    p_create_pr.add_argument("name", nargs="?", help="Task directory (defaults to active task)")
+    p_create_pr.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the push / gh commands without executing them",
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -492,6 +503,7 @@ def main() -> int:
         "archive": cmd_archive,
         "add-subtask": cmd_add_subtask,
         "remove-subtask": cmd_remove_subtask,
+        "create-pr": cmd_create_pr,
         "list": cmd_list,
         "list-archive": cmd_list_archive,
     }
