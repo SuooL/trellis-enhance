@@ -39,6 +39,29 @@ trellis-enhance 的四条自有流程在 dogfood 使用中主诉为**步骤太�
 - **`git push` 无人认领**：`workflow.md:655` 明确 "Never push to remote"，下一步 3.5 就要求开 PR。
 
 ### 子任务 2 — `07-27-git-workflow-repair`（Git/CI 标准）
+
+> **2026-07-27 实测更新（PR #3 / #4 实弹跑出来的证据，优先级高于下方基于模板的审计）**
+>
+> **(a) 本仓有三份互相分歧的 CI 定义，且旗舰门禁自己不用：**
+>
+> | 文件 | 触发 | job | diff-cover |
+> |---|---|---|---|
+> | `.github/workflows/ci.yml` | `main` | `build` | 0 处（另有 Lint + Verify build output）|
+> | `.github/workflows/ci-dev.yml` | `dev` | `verify` | **0 处** |
+> | `templates/git-workflow/workflows/ci.yml`（发布给用户）| — | `verify` | 6 处 |
+>
+> 即 **diff-coverage ≥80% 硬门禁只存在于发给用户的模板里，trellis-enhance 自己不执行**。
+> 该门禁在文档中被写了 5 处并作为 Definition of Done 的核心。
+> 实证后果：一个新增 ~150 行、**零测试**的 PR（#3）一路绿灯合入 `dev`。
+> 附带：`pnpm lint` 只在 `main` 路径的 `ci.yml` 里，feature→dev 这条日常路径上从不运行。
+>
+> **(b) 合并后远端分支未被删除**（与 `git-workflow.md:45-47` 的承诺矛盾）：
+> `delete_branch_on_merge=true` 已开启、分支无保护、无 ruleset，但 PR #3 合并后
+> `origin/feature/broken-step-repair` 仍存在（API 直查确认）。
+> **假设（未验证）**：`ci-dev.yml:66` 的 `gh pr merge --auto --squash` 未带 `--delete-branch`，
+> auto-merge 请求自带的 `delete_branch` 默认 false 并覆盖仓库级设置。加一个 flag 即可验证。
+> 叠加已知的本地清理失效（squash 场景下 ancestry 检测必然失败），**远端与本地清理双双不生效**。
+
 - **本地分支清理必然失效**：`git_branch.py:152-159` 注释自述 ancestry 检查测不到 squash merge，
   而 `ci.yml:98` 用的正是 `--squash` → `spec/git-workflow.md:45-47` 承诺的自动清理 100% 不发生。
 - **`ci.yml` 零逃生舱**：无 `paths-ignore`（改 README 也跑全量 npm ci+build+test+diff-cover）、
@@ -118,6 +141,17 @@ trellis-enhance 的四条自有流程在 dogfood 使用中主诉为**步骤太�
   一次确认停顿，与减摩擦初衷冲突。规则的具体维度（改动文件数 / 是否跨包 / 是否触及 `src` 等）
   在子任务 1 的规划阶段确定，规则必须可机器判定；AI 只对规则未覆盖的情形裁量，
   且裁量结果需在产物中留痕以便复盘。（2026-07-27 确认）
+
+## 遗留待办（本批次发现，未在子任务 0 处理）
+
+- `CLAUDE.md` 声称测试有 2 个既有失败 —— **已过期**，实测 53 文件全绿。需修正。
+- `build_finish_prompt()` 的 `[finish]` 触发词疑似死代码：`workflow.md` 与各命令均未指示
+  dispatch prompt 含该字面量。判定需独立确认。
+- `git-workflow.md:40` 与 Pre-Dev Checklist 第 2 项仍要求手工 `set-base-branch dev`，
+  但 `git_branch.py:215-217` 已在 `after_create` 自动设好（实测确认）。归子任务 2。
+- `_print_manual_pr_commands` 用 `subprocess.list2cmdline()` 渲染回退命令，
+  该函数恒用 Windows 风格引号。当前输入（任务标题/分支名）不含 shell 元字符，风险低；
+  若日后标题可能含 `"` / 反引号 / `$`，需换 POSIX 引号。仅登记，不急。
 
 ## 待定（需在各子任务规划阶段确认）
 
