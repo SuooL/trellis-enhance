@@ -12,7 +12,7 @@
   "assignee": "suool",
   "createdAt": "2026-07-27",
   "completedAt": null,
-  "branch": "feature/subtask3-mcp-probe",
+  "branch": "feature/mcp-wildcard-fix",
   "base_branch": "dev",
   "worktree_path": null,
   "commit": null,
