@@ -3648,7 +3648,7 @@ print(len(entries))
     expect(body).toMatch(/Lightweight: `prd\.md` can be enough/);
     expect(body).toMatch(/Complex: finish `prd\.md`, `design\.md`, and `implement\.md`/);
     expect(body).toContain(
-      "curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start",
+      "complex tasks only: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start",
     );
   });
 
@@ -3659,13 +3659,22 @@ print(len(entries))
       "curated when extra spec or research context is needed",
     );
     expect(wf).toContain(
-      'Ready gate: both `implement.jsonl` and `check.jsonl` must contain at least one real `{"file": "...", "reason": "..."}` entry before `task.py start`.',
+      'Ready gate (complex tasks): both `implement.jsonl` and `check.jsonl` must contain at least one real `{"file": "...", "reason": "..."}` entry before `task.py start`.',
     );
     expect(wf).toContain(
-      "Runtime consumers tolerate missing or seed-only manifests for compatibility, but that tolerance is not a planning-ready state.",
+      "Runtime consumers tolerate missing or seed-only manifests for compatibility, but that tolerance is not a planning-ready state for a complex task.",
     );
     expect(wf).toContain(
-      "`implement.jsonl` and `check.jsonl` each contain at least one real curated entry (seed row does not count)",
+      "`implement.jsonl` and `check.jsonl` each contain at least one real curated entry, seed row does not count (complex tasks)",
+    );
+    // #292 scoped the gate to *complex* tasks ("complex sub-agent-dispatch
+    // tasks are not considered planning-complete until both manifests contain
+    // real entries"); the qualifier was lost when the text was written, so a
+    // lightweight PRD-only task was also being blocked. Keep both halves
+    // pinned: the gate still bites for complex tasks, and lightweight tasks
+    // are explicitly exempt.
+    expect(wf).toContain(
+      "Lightweight tasks are PRD-only and skip this step",
     );
 
     const templateRoot = path.join(
@@ -3686,7 +3695,7 @@ print(len(entries))
         "utf-8",
       );
       expect(content, relativePath).toContain(
-        "Sub-agent-dispatch tasks have real curated entries in both `implement.jsonl` and `check.jsonl`; seed-only manifests are not ready.",
+        "Complex sub-agent-dispatch tasks have real curated entries in both `implement.jsonl` and `check.jsonl`; seed-only manifests are not ready. Lightweight PRD-only tasks skip this.",
       );
     }
   });
