@@ -103,6 +103,48 @@ its presence to decide whether to self-load context (see
 reimplementation of the same hook. Changes to the Python builders must be
 mirrored there or the twins drift.
 
+### Contract: agent `tools:` must name MCP servers explicitly
+
+**Never write a bare `mcp__*` wildcard in an agent's `tools:` frontmatter — it
+matches nothing.** Use `mcp__<server>__*` or an exact tool name.
+
+Measured 2026-07-27 with four probe agents differing only in that one line, all
+dispatched in the same session against the same MCP configuration:
+
+| `tools:` | MCP tools the sub-agent received |
+|---|---|
+| `Read, Bash` (control) | 0 |
+| `Read, Bash, mcp__*` | **0** |
+| `Read, Bash, mcp__codex__*` | 2 |
+| `Read, Bash, mcp__codex__codex` | 1 |
+
+This is why `trellis-check`'s cross-model review silently never happened: the
+tool was not merely unauthorized, it was absent, so the agent fell through to
+its native-review fallback on every single run. Any agent whose value depends
+on an MCP tool must therefore also **state in its report which reviewer actually
+ran** — a silent fallback is indistinguishable from success.
+
+**Naming a server the user does not have is safe.** A probe listing
+`mcp__nosuchserver__*` registered normally and simply received no tool from it;
+a probe mixing a real and a fake server received the real one. An older comment
+in `configurators/shared.ts` claimed explicit names cause a silent
+*agent-registration* skip when the server is absent (referencing #302) — that
+was not reproducible and the comment has been corrected. Do not reintroduce
+`mcp__*` on that rationale.
+
+Sub-agents also do **not** get a `ToolSearch` tool, so with tool-search
+deferral enabled (`ENABLE_TOOL_SEARCH`, default on) they cannot lazily load an
+MCP schema the way the main session can. Whatever their `tools:` line
+materializes is all they will ever have.
+
+> **Testing agent-definition changes**: the agent registry refreshes with a long,
+> sporadic delay (~10 minutes observed) — not at session start, and not
+> immediately. A newly added agent reporting "not found" therefore proves
+> nothing on its own. **Always create a control agent in the same batch**; only
+> when the control registers and the subject does not have you measured a real
+> behavioral difference. Skipping this control produced one wrong conclusion
+> during this investigation.
+
 **Claude Code pattern** (full hooks + agents + settings):
 
 | Directory                            | Contents                                                     |
