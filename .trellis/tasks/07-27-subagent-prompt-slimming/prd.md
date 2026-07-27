@@ -103,6 +103,31 @@ agent（`claude/agents/trellis-check.md`，116 行，Codex 委托流）
   （见 `.trellis/spec/cli/backend/platform-integration.md`，子任务 0 已确立）。
 - 探针文件 `.claude/agents/probe-mcp-*.md` 是一次性的，**不得进入模板**，实验后删除。
 
+## 完成状态（2026-07-27）
+
+| 项 | 状态 | 交付 |
+|---|---|---|
+| D1 跨模型审查失效 | ✅ 根因定位并修复 | 根因是 D2 的通配符（PR #7）|
+| D2 `mcp__*` 通配符 | ✅ 7 处改精确枚举 | PR #7；#302 断言经实验推翻 |
+| D3 提示词减重 | ✅ 375 → 267 行（-29%）| PR #8 |
+| D4 check 轻量档 | ✅ docs-only 档，按文件类型判定 | PR #8 |
+| D5 超时/重试/体积预算 | ✅ 重试 1 次 / 1500 行阈值 / 循环上限 3 | PR #8 |
+| D6 agent/skill 双形态 | ⏸ **移交子任务 1** | 见下 |
+
+**D6 移交理由**：修它要同时改 `workflow.md:226` 与 `configurators/shared.ts` 的
+`SKILL_DESCRIPTIONS`，与子任务 1 的 workflow.md 改动直接冲突，并行做会互相覆盖。
+已在子任务 1 的范围内登记。
+
+**本任务被 blocked 的原因**：验收标准第 2 条（跨模型审查**可被验证真实发生**）
+无法在当前环境勾选 —— MCP 调用仍返回 401，根因是 CC switch 向 Claude Code 进程注入
+第三方 `OPENAI_API_KEY` 而 `~/.codex/config.toml` 没有对应的 `[model_providers]`
+base URL 配置。**属用户环境问题，不是 Trellis 代码缺陷**，Trellis 侧无可修之处。
+
+解除条件：用户配好 codex 的 provider 后，用一个含已知 bug 的 diff 实跑 `trellis-check`，
+确认拿到的是 Codex 的 findings（报告首行会声明实际审查者）。届时勾选该条并归档。
+
+未动：其余 5 个平台的 agent 变体（内容本就各异，不在本次范围）。
+
 ## Acceptance Criteria
 
 - [ ] `MCP-PROBE-PROTOCOL.md` 的实验已在新会话完成，结论已回填。
