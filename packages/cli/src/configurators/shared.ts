@@ -681,19 +681,33 @@ function mapLegacyToolToCopilot(tool: string): string[] {
       return ["search"];
     case "Bash":
       return ["execute"];
-    // Generic MCP wildcard — used by trellis-research to opt into "any MCP
-    // tool the user has configured" without locking the source template to a
-    // specific provider. Claude Code parses wildcards as glob-match-at-runtime
-    // (no silent agent-registration skip if nothing matches), so this is the
-    // safe default; explicit `mcp__exa__*` names would silent-skip the agent
-    // when the Exa MCP server is absent (#302).
+    // MCP entries map to Copilot's own external-tool names. The source
+    // templates name servers explicitly rather than using a bare `mcp__*`
+    // wildcard: measured 2026-07-27, `mcp__*` matches nothing at all, so an
+    // agent carrying it silently receives ZERO MCP tools. Naming a server
+    // that the user does not have is harmless — the entry is dropped and the
+    // agent still registers (this supersedes the #302 note that claimed
+    // explicit names cause a silent agent-registration skip; that behavior
+    // was not reproducible).
+    //
+    // `mcp__*` is kept below so projects that still carry the old frontmatter
+    // keep transforming correctly during `trellis update`.
     case "mcp__*":
       return ["web", "exa/*", "chrome-devtools/*"];
+    // Documentation / external lookup servers → Copilot's search tools.
+    case "mcp__plugin_context7_context7__*":
     case "mcp__exa__web_search_exa":
     case "mcp__exa__get_code_context_exa":
       return ["web", "exa/*"];
     case "mcp__chrome-devtools__*":
+    case "mcp__plugin_chrome-devtools-mcp_chrome-devtools__*":
       return ["chrome-devtools/*"];
+    // No Copilot equivalent: cross-model review (codex) and reference
+    // management (zotero) have no counterpart in Copilot's tool vocabulary.
+    case "mcp__codex__codex":
+    case "mcp__codex__codex-reply":
+    case "mcp__zotero-mcp__*":
+      return [];
     case "Skill":
       return [];
     default:

@@ -115,12 +115,83 @@ rm .claude/agents/probe-mcp-*.md
 
 ---
 
-## 结论（实验后回填）
+## 结论（2026-07-27 已完成）
 
-- 实验日期：
-- `probe-mcp-none`（阴性对照）：
-- `probe-mcp-bare`（`mcp__*`）：
-- `probe-mcp-server`（`mcp__codex__*`）：
-- `probe-mcp-exact`（`mcp__codex__codex`）：
-- 判定：
-- 对 7 处 `mcp__*` 的处置决定：
+### 关于「必须重启会话」——**该前提是错的**
+
+实验**未经重启即完成**。四个探针文件写入后，harness 在同一会话内刷新了 agent 注册表
+（收到 "New agent types are now available" 通知）。
+上一会话 `probe-tools` 报 `Agent type not found` 只是**刷新尚未发生**，不是「启动时锁死」。
+
+**修正结论**：子代理定义是**延迟刷新**，不是会话启动时锁死。本文件开头「为什么需要重启会话」
+一节的推论作废，保留仅为记录当时的判断依据。
+
+### 探测结果
+
+| 探针 | `tools:` | 拿到的 MCP 工具 | 调用结果 |
+|---|---|---|---|
+| `probe-mcp-none` | `Read, Bash` | 0 | —（对照组干净，无误报）|
+| `probe-mcp-bare` | `+ mcp__*` | **0** | 拿不到 |
+| `probe-mcp-server` | `+ mcp__codex__*` | **2** ✅ | 可调用 → 401 |
+| `probe-mcp-exact` | `+ mcp__codex__codex` | **有** ✅ | 可调用 → 401 |
+
+### 判定：发现两个**互相独立**的缺陷
+
+**缺陷 A — `mcp__*` 裸通配符匹配不到任何工具。**
+两种文档形式（`mcp__<server>__*` 与精确工具名）**都有效**，裸通配符**零命中**。
+同一会话、同一环境、同一时刻的对照，因此与环境无关，是纯粹的写法错误。
+**`trellis-check` 一直卡在这一层** —— 工具不可见，连发请求的机会都没有。
+
+**缺陷 B — 即使工具可达，调用也会 401。**
+根因：Claude Code 进程环境被 **CC switch** 注入了第三方 `OPENAI_API_KEY`；
+`codex mcp-server` 由 Claude Code spawn，继承该环境后从 `chatgpt` 认证切成 key 认证，
+而 `~/.codex/config.toml` **没有为 OpenAI 配任何自定义 `base_url`**，
+于是第三方 key 被发往 `api.openai.com` → key 与地址不匹配 → 401。
+
+对比证据：
+- Bash 工具 → `codex exec`：环境从 shell profile 起，**无** `OPENAI_API_KEY`，
+  走 `~/.codex/auth.json` 的 `auth_mode: chatgpt` → **正常**
+  （在本项目目录实测返回 `PROBE_OK`，排除了 cwd / 项目配置的干扰）。
+- 用户 `.zshenv` 里的自定义 base URL 是给 GEMINI / DOUBAO（`windhub.cc`）的，**不作用于 codex**。
+
+**两个缺陷必须都修，或绕开两者走 CLI**：只修 A → 从「看不见」变成「401」；只修 B → 工具仍不可见。
+
+### 追加实验：#302「显式命名会导致 agent 静默不注册」——**推翻**
+
+`configurators/shared.ts:684-689` 原注释断言：列出不存在的 MCP server 会让 agent
+被静默跳过注册（引用 issue #302），因此才用 `mcp__*`。该断言**当前不成立**：
+
+| 探针 | `tools:` | 是否注册 | 实际拿到 |
+|---|---|---|---|
+| `probe-absent` | `Read, Bash, mcp__nosuchserver__*` | ✅ 是 | `Read, Bash`（假 server 被静默忽略）|
+| `probe-mixed` | `+ mcp__codex__codex, mcp__nosuchserver__*` | ✅ 是 | `Read, Bash, mcp__codex__codex`（真的进来，假的丢掉）|
+
+**结论：命名不存在的 server 是无害的** —— 条目被丢弃，agent 照常注册。
+因此显式枚举安全，`mcp__*` 没有任何优势（它反而一个工具都拿不到）。
+
+> 实验过程提示：agent 注册表刷新是**偶发且有较长延迟**的（本次等待约 10 分钟才生效），
+> 不是「会话启动锁死」，也不是「立即生效」。测这类改动要有耐心，
+> 并且**必须带一个同批创建的对照 agent**，否则无法区分「行为如此」与「尚未刷新」。
+
+### MCP vs `codex exec`（Bash）—— 二者不等价
+
+| 维度 | `mcp__codex__codex` | `codex exec` |
+|---|---|---|
+| 输出 | 结构化返回 | 裸 stdout，混有 `hook: SessionStart` 等噪音 |
+| 超时 | 不受 Bash 工具约束 | **受 Bash 工具 600 秒上限**——`xhigh` 长审查有被砍风险 |
+| 多轮续接 | `codex-reply` 专门设计 | `exec resume --last`，可行但更笨拙 |
+| 环境 | 继承 Claude Code 进程环境 → **受 CC switch 注入影响（缺陷 B）** | 从 shell profile 起，不受影响 |
+| 可移植性 | 需使用者配置 codex MCP server | 只需 `codex` 在 PATH |
+
+**决定：MCP 为主路径**（超时上限与输出洁净度是硬优势），`codex exec` 作为 MCP
+不可用/调用失败时的降级。
+
+### 处置决定
+
+- **主路径**：MCP（`mcp__codex__codex`）。`codex exec` 作为降级。
+  理由见上表 —— 二者不等价，MCP 在超时上限与输出洁净度上有硬优势。
+- **缺陷 A**：7 处 `mcp__*` 换成精确枚举（用户决定：不用通配符，列出当前实际可用的 server）。
+  已完成；`configurators/shared.ts` 的 Copilot 映射同步更新，并更正了引用 #302 的过时注释。
+- **缺陷 B**：属用户环境问题，非 Trellis 代码缺陷。需给 codex 配 `[model_providers]`
+  说明该 key 对应的 base URL，或阻止 codex MCP 继承该 key。**已告知用户，Trellis 侧不处理。**
+- MCP 通路在 A 修好后作为第二道保险保留（B 修好后才真正可用）。
