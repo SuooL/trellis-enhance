@@ -62,6 +62,19 @@ trellis-enhance 的四条自有流程在 dogfood 使用中主诉为**步骤太�
 > auto-merge 请求自带的 `delete_branch` 默认 false 并覆盖仓库级设置。加一个 flag 即可验证。
 > 叠加已知的本地清理失效（squash 场景下 ancestry 检测必然失败），**远端与本地清理双双不生效**。
 
+- **【2026-07-27 实测新增】`base_branch` 记录成当前分支，在 feature 分支上建任务必然出错。**
+  `task_store.py:294,313` 的 `cmd_create` 把**当前分支**写进 `base_branch`
+  （注释自述 "Record current branch as base_branch (PR target)"）。
+  而 `git_branch.py:216-217` 只在该值为空或等于 `main` 时才纠正为 `dev` ——
+  值是 `feature/xxx` 时两个条件都不满足，错误值被保留。
+  本次连建 5 个子任务复现：每个任务的 base 都变成了**上一个任务的 feature 分支**
+  （只有在 `dev` 上创建的第一个是对的）。在三分支模型里 PR 目标恒为 `dev`，
+  所以只要不在 `dev` 上建任务，base 就是错的。
+  由 `create-pr` 在实跑中暴露（gh 报 "No commits between feature/git-workflow-repair
+  and feature/subtask3-mcp-probe"）。已手工修正 4 个任务的数据。
+  **修法待定**：让 `cmd_create` 直接写 `dev`，或让 `git_branch.py` 无条件纠正。
+  附带可考虑：`create-pr` 在调 gh 前预检 `base_branch` 是否存在于 origin。
+
 - **本地分支清理必然失效**：`git_branch.py:152-159` 注释自述 ancestry 检查测不到 squash merge，
   而 `ci.yml:98` 用的正是 `--squash` → `spec/git-workflow.md:45-47` 承诺的自动清理 100% 不发生。
 - **`ci.yml` 零逃生舱**：无 `paths-ignore`（改 README 也跑全量 npm ci+build+test+diff-cover）、
