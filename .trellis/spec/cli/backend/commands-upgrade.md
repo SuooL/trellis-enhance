@@ -1,70 +1,65 @@
 # `trellis upgrade` Command
 
-How `trellis upgrade` upgrades the globally installed Trellis CLI package.
+How `trellis upgrade` tells the user to upgrade their `trellis-enhance` install.
 
-This command is intentionally separate from `trellis update`:
+`trellis-enhance` is **not published to any npm registry**. The global `trellis` / `tl` command is a
+symlink into a source clone's build output, so "upgrading the CLI" means `git pull` + rebuild in that
+clone — there is no package for a package manager to fetch. `trellis upgrade` is therefore a
+**guidance command**: it prints the correct steps and exits. It never installs anything.
 
-- `trellis upgrade` updates the **CLI binary** by running npm's global install.
-- `trellis update` updates a **project's bundled Trellis files** under `.trellis/`
-  and platform directories.
+This command stays separate from `trellis update`:
+
+- `trellis upgrade` tells you how to refresh the **CLI itself** (the source clone + its build).
+- `trellis update` refreshes a **project's** bundled Trellis files under `.trellis/` and the platform
+  directories, from the templates of whatever CLI build is currently linked.
 
 ---
 
 ## User-facing contract
 
 ```text
-trellis upgrade [--tag <tag-or-version>] [--dry-run]
+trellis upgrade
 ```
 
 Behavior:
 
-- Builds and runs `npm install -g @mindfoldhq/trellis@<tag>`.
-- POSIX execution must spawn `npm` directly without shell execution.
-- Windows execution must route through `cmd.exe /d /s /c npm install -g ...`
-  instead of directly spawning `npm.cmd`.
-- Uses the current CLI channel by default:
-  - stable versions install `@latest`
-  - `-beta.*` versions install `@beta`
-  - `-rc.*` versions install `@rc`
-- `--tag <tag-or-version>` overrides the inferred channel. Accept simple npm
-  dist-tags or versions such as `latest`, `beta`, `rc`, or `0.6.0-beta.8`.
-- `--dry-run` prints the exact npm command and exits without changing anything.
+- Takes **no options**. The former `--tag <tag-or-version>` and `--dry-run` flags are removed: `--tag`
+  selected an npm dist-tag / version that no longer exists, and `--dry-run` only made sense when the
+  command had a side effect to suppress. This command is already side-effect-free.
+- Never spawns `npm`, `pnpm`, or any other package manager, and never builds a shell command string.
+- Prints the self-hosted upgrade sequence: pull the source clone, then rebuild so the symlinked global
+  command reflects the new code:
 
-The implementation does not detect or preserve the original installer. Trellis
-is published as an npm package, so npm is the upgrade backend even when the user
-installed Node through pnpm, Homebrew, Volta, proto, or another manager.
+  ```text
+  cd <trellis-enhance clone>
+  git pull
+  pnpm install                          # only needed when dependencies changed
+  pnpm --filter trellis-enhance build   # global `trellis` is now current
+  ```
+
+- States that the clone's husky `post-merge` / `post-checkout` hooks already rebuild automatically
+  when product source changed, so the explicit `build` is a fallback for when the hook was skipped
+  (e.g. dependencies not installed yet, or a build failure was reported).
+- Exits zero. There is no failure path to model, because nothing external is invoked.
+
+The command does not try to locate the user's clone, mutate it, run git on the user's behalf, or
+detect how the symlink was created. Guidance only — driving someone else's source checkout from a CLI
+that lives inside it is a footgun, not a feature.
 
 ---
 
-## Failure behavior
+## Reporting the current install
 
-- If npm is unavailable, fail with the manual npm command.
-- If npm exits non-zero, surface the exit code.
-- If npm is interrupted by a signal, report the signal.
-- Append troubleshooting guidance for npm global prefix / PATH mismatches,
-  permissions, existing-bin or locked-file conflicts, and the manual command.
-- Do not automatically run `sudo`, pass `--force`, rewrite npm prefix, delete
-  files, or detect package managers.
-- Reject shell-shaped `--tag` input before spawning npm. Never build a shell
-  command string for POSIX execution.
-
-## Success behavior
-
-After npm reports success, print both:
+To let the user confirm which build is actually on PATH, the output also points at:
 
 ```text
 trellis --version
-```
-
-and a platform-specific binary-resolution check:
-
-```text
 which trellis   # POSIX
 where trellis   # Windows
 ```
 
-This catches the common case where npm installed into one global prefix while
-the user's shell still resolves an older `trellis` binary earlier on PATH.
+This catches the common case where the shell resolves an older `trellis` binary earlier on PATH than
+the symlink into the clone, which makes a successful rebuild look like it did nothing.
 
 ---
 
@@ -76,23 +71,26 @@ Any user-facing hint that previously said:
 npm install -g @mindfoldhq/trellis@latest
 ```
 
-should now prefer:
+must not be reintroduced — the package does not exist. Hints should point to `trellis upgrade`
+instead. This applies to CLI startup warnings, `trellis update` downgrade guidance, and session-start
+update hints.
 
-```text
-trellis upgrade
-```
-
-This applies to CLI startup warnings, `trellis update` downgrade guidance, and
-session-start update hints.
+There is also no "latest version" to compare against: `getLatestNpmVersion()` in
+`commands/update.ts` returns `null` unconditionally and never contacts a registry. Update hints
+compare the project's `.trellis/.version` against the linked CLI's own version only.
 
 ---
 
 ## Test requirements
 
-- Tag inference: stable → `latest`, beta → `beta`, RC → `rc`.
-- Explicit tag override.
-- Invalid tag rejection.
-- POSIX direct npm command with `shell: false`.
-- Windows `cmd.exe /d /s /c npm ...` command plan with `shell: false`.
-- Dry-run does not spawn npm.
-- Non-zero npm exit becomes a command failure with troubleshooting guidance.
+- Running the command produces guidance output and spawns no child process.
+- No option parsing for `--tag` / `--dry-run` (they are not accepted).
+- Output names the clone-pull + rebuild steps and the `trellis --version` / `which trellis` check.
+
+---
+
+## Cross-references
+
+- Install and dev-loop model: `CLAUDE.md` → "How install works"
+- Release model (no npm publish): `release-process.md`
+- Project-file refresh semantics: `commands-update.md`

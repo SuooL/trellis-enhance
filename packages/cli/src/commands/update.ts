@@ -1963,7 +1963,9 @@ export async function update(options: UpdateOptions): Promise<void> {
   console.log(chalk.cyan("\nTrellis Update"));
   console.log(chalk.cyan("══════════════\n"));
 
-  // Set up proxy before any network calls (npm version check)
+  // Honour proxy env vars for any outbound request made downstream. This is NOT
+  // for an npm version check — `getLatestNpmVersion()` returns null and never
+  // contacts a registry in this fork (see FORK.md / CLAUDE.md).
   setupProxy();
 
   // Get versions

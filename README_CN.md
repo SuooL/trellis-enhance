@@ -20,16 +20,13 @@
 </p>
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@mindfoldhq/trellis"><img src="https://img.shields.io/npm/v/@mindfoldhq/trellis.svg?style=flat-square&color=2563eb" alt="npm version" /></a>
-<a href="https://www.npmjs.com/package/@mindfoldhq/trellis"><img src="https://img.shields.io/npm/dw/@mindfoldhq/trellis?style=flat-square&color=cb3837&label=downloads" alt="npm downloads" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-16a34a.svg?style=flat-square" alt="license" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/stargazers"><img src="https://img.shields.io/github/stars/mindfold-ai/Trellis?style=flat-square&color=eab308" alt="stars" /></a>
+<a href="https://github.com/SuooL/trellis-enhance/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-16a34a.svg?style=flat-square" alt="license" /></a>
+<a href="https://github.com/SuooL/trellis-enhance/stargazers"><img src="https://img.shields.io/github/stars/SuooL/trellis-enhance?style=flat-square&color=eab308" alt="stars" /></a>
 <a href="https://docs.trytrellis.app/zh"><img src="https://img.shields.io/badge/docs-trytrellis.app-0f766e?style=flat-square" alt="docs" /></a>
 <a href="https://discord.com/invite/tWcCZ3aRHc"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/issues"><img src="https://img.shields.io/github/issues/mindfold-ai/Trellis?style=flat-square&color=e67e22" alt="open issues" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/pulls"><img src="https://img.shields.io/github/issues-pr/mindfold-ai/Trellis?style=flat-square&color=9b59b6" alt="open PRs" /></a>
-<a href="https://deepwiki.com/mindfold-ai/Trellis"><img src="https://img.shields.io/badge/Ask-DeepWiki-blue?style=flat-square" alt="Ask DeepWiki" /></a>
-<a href="https://chatgpt.com/?q=Explain+the+project+mindfold-ai/Trellis+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
+<a href="https://github.com/SuooL/trellis-enhance/issues"><img src="https://img.shields.io/github/issues/SuooL/trellis-enhance?style=flat-square&color=e67e22" alt="open issues" /></a>
+<a href="https://github.com/SuooL/trellis-enhance/pulls"><img src="https://img.shields.io/github/issues-pr/SuooL/trellis-enhance?style=flat-square&color=9b59b6" alt="open PRs" /></a>
+<a href="https://chatgpt.com/?q=Explain+the+project+SuooL/trellis-enhance+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
 </p>
 
 <p align="center">
@@ -44,7 +41,7 @@
 | **任务驱动工作流** | PRD、实现上下文、审查上下文与任务状态统一存放于 `.trellis/tasks/`，AI 开发过程保持结构化、可追溯。 |
 | **项目记忆** | `.trellis/workspace/` 中的工作日志（journal）会保留上一次会话的脉络，因此每次新会话都能基于真实上下文开始。 |
 | **团队共享标准** | Spec 随仓库一同版本化，个人总结出的规则与流程可以直接成为整个团队的基础设施。 |
-| **多平台复用** | 同一套 Trellis 结构覆盖 16 个 AI coding 平台，无需为每个工具单独搭建工作流。 |
+| **多平台复用** | 同一套 Trellis 结构覆盖 17 个 AI coding 平台，无需为每个工具单独搭建工作流。 |
 
 ## 前置要求
 
@@ -53,9 +50,16 @@
 
 ## 快速开始
 
+`trellis-enhance` **不发布到任何 npm registry** —— 它从源码安装，全局 `trellis` / `tl` 命令以 symlink
+指向本仓库的构建产物，因此重新 build 即刻生效（见 [CLAUDE.md → How install works](./CLAUDE.md)）。
+
 ```bash
-# 1. 安装 Trellis
-npm install -g @mindfoldhq/trellis@latest
+# 1. 从源码安装 Trellis-Enhance（一次性）
+git clone https://github.com/SuooL/trellis-enhance.git
+cd trellis-enhance
+pnpm install                                  # 同时装好 husky hook
+pnpm --filter trellis-enhance build           # tsc + copy-templates → dist/
+cd packages/cli && pnpm link --global         # 提供 `trellis` / `tl` 命令
 
 # 2. 在仓库中初始化
 trellis init -u your-name
@@ -63,6 +67,9 @@ trellis init -u your-name
 # 3. 或仅初始化你实际使用的平台
 trellis init --cursor --opencode --codex -u your-name
 ```
+
+后续更新只需在该 clone 内 `git pull` —— husky 的 `post-merge` hook 会在产品源码发生变化时自动重新
+build，因此永远不需要重新安装。
 
 查看 [快速开始](https://docs.trytrellis.app/zh/start/install-and-first-task) 与 [支持平台](https://docs.trytrellis.app/zh/advanced/multi-platform) 指南以了解详细配置步骤。
 

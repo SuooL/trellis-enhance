@@ -2,8 +2,14 @@
 """Git branch lifecycle hook for Trellis tasks.
 
 Implements the three-branch model (see .trellis/spec/tech/git-workflow.md):
-creates a `feature/<task-slug>` branch when a task is created, and deletes the
-local feature branch once it has merged into `dev`.
+creates a `feature/<task-slug>` branch when a task is created, and — on archive —
+deletes the local feature branch, but only when the merge into `dev` is
+detectable by ancestry.
+
+    Caveat: `ci.yml` auto-merges with `--squash`, which leaves no ancestry link,
+    so under the default flow `cleanup` safe-skips and the local branch stays.
+    See `_is_merged_into` for the full explanation. Remote branches are deleted
+    by CI's `--delete-branch` / the weekly `prune-branches.yml` job instead.
 
 Usage (called automatically by task.py hooks via config.yaml):
     python3 .trellis/scripts/hooks/git_branch.py create

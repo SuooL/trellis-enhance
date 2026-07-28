@@ -1,8 +1,9 @@
 # FORK.md — Trellis-Enhance (SuooL's self-maintained Trellis)
 
 > **`trellis-enhance`** — my own, self-maintained product, forked from
-> [Trellis](https://github.com/mindfold-ai/Trellis). The npm package is renamed to `trellis-enhance`
-> (the command stays `trellis` / `tl`), and it does **not** track or phone the upstream npm package —
+> [Trellis](https://github.com/mindfold-ai/Trellis). The package is renamed to `trellis-enhance`
+> (the command stays `trellis` / `tl`). It is **never published to any npm registry** — it is installed
+> from source with a global symlink (§4) — and it does **not** track or phone the upstream npm package:
 > `trellis update` refreshes projects purely from this CLI's own templates. `upstream` is kept only as a
 > git remote for occasional manual comparison.
 > This document is the development record + maintenance guide. Auto-loaded quick context: [`CLAUDE.md`](./CLAUDE.md).
@@ -36,14 +37,22 @@ This repo is **standalone** (not a GitHub fork) and follows trellis-enhance's ow
 | `feature/<task-slug>` | Per-task development (created off `dev` by the `git_branch.py` hook). Flow: `feature` → PR → `dev` → `main`. |
 | `upstream` = `mindfold-ai/trellis` | Kept only for occasional manual comparison. |
 
-**Install (personal use):**
+**Install (from source — there is no npm package):**
 ```bash
-npm i -g 'git+https://github.com/SuooL/trellis-enhance.git'   # installs the default branch (main)
+git clone https://github.com/SuooL/trellis-enhance.git
+cd trellis-enhance
+pnpm install                              # also installs the husky hooks
+pnpm --filter trellis-enhance build       # tsc + copy-templates → dist/
+cd packages/cli && pnpm link --global     # provides `trellis` / `tl`
 ```
-(For local dev the symlink model in §4 is the maintained path — no reinstall.)
+A plain `npm i -g 'git+…trellis-enhance.git'` does **not** work: the repo root `package.json` is
+`{"private": true}` with no `name` / `version` / `bin`, the CLI lives in `packages/cli`, and it depends
+on core via `workspace:*` — none of which a single-package global install can resolve. The symlink
+model in §4 is the only maintained path, on every machine.
 
 **Compare with upstream when I want (manual, not automatic):**
 ```bash
+git config remote.upstream.tagOpt --no-tags               # ONE-TIME per clone — see CLAUDE.md §Branch model
 git fetch upstream
 git log --oneline upstream/main ^main                     # commits upstream has that main doesn't
 git diff upstream/main main -- packages/cli/src/templates  # how my defaults differ from upstream
@@ -107,7 +116,9 @@ Every `trellis init` now also writes a complete Git workflow standard:
   (uses `gh pr list --state merged`, because squash-merge breaks ancestry checks).
 - **Branch lifecycle hook** (`scripts/hooks/git_branch.py`, always included, safe-skips on non-git):
   `after_create` creates `feature/<slug>` **off `dev`** and defaults `base_branch=dev`; `after_archive`
-  deletes the local branch once merged.
+  deletes the local branch **only when it was a non-squash merge** — the check is ancestry-based, and
+  the default auto-merge is `--squash`, so in practice it safe-skips and the local branch is left
+  behind. Remote deletion is handled by CI's `--delete-branch`.
 - Sources: `templates/git-workflow/{spec,workflows}/…`, wired via `templates/git-workflow/index.ts`,
   `configurators/workflow.ts`, `templates/trellis/index.ts`.
 
@@ -131,20 +142,31 @@ d=$(mktemp -d); ( cd "$d" && git init -q \
 #         git_branch.py hook, task.py set-status, .github/workflows/*, spec/tech/git-workflow.md
 ```
 
-- ⚠️ Global CLI = "current checked-out branch + last build here". `git checkout main` + build → temporarily
-  loses customizations; switch back to `custom` + rebuild to restore.
+- ⚠️ Global CLI = "current checked-out branch + last build here". Switching branches changes what the
+  global `trellis` does; rebuild after any `git switch` so it reflects that branch's code. (There is no
+  `custom` branch — the model is `main` / `dev` / `feature/*`.)
 - 🔁 Re-link only if the symlink is ever removed: `cd packages/cli && pnpm link --global`. (The
   `@mindfoldhq/trellis → trellis-enhance` rename did not need a relink — the bin symlink resolves by path.)
-- 🪝 **Auto-build hooks (run once per clone):** `sh scripts/setup-dev-hooks.sh` installs local `post-merge` + `post-checkout` hooks that rebuild the CLI automatically after merge/pull/branch-switch **when product source changed** (dogfood-only changes skip). So merges give you the latest features with no reinstall and no manual build.
-- 🤖 **Self-CI (this repo's own git-workflow):** PRs into `dev` are gated by `.github/workflows/ci-dev.yml` (typecheck + test + build) and auto-merged (squash) when green; `delete_branch_on_merge` + the weekly `prune-branches.yml` clean up `feature/*`. `dev` has branch protection requiring the `verify` check. `main` is release-only (manual). The old `.github/workflows/{ci,publish}.yml` are upstream leftovers (publish.yml targets npm, which this fork does not use).
-- ✋ No `npm i -g` for local dev. A from-scratch git-install (`npm i -g 'git+…trellis-enhance.git'`, default branch `main`) is a fallback for
-  *other* machines, but note the CLI depends on `@mindfoldhq/trellis-core` via `workspace:*`, so a clean
-  external install may need adjustment — the symlink model above is the maintained path.
+- 🪝 **Auto-build hooks — nothing to install.** `.husky/post-merge` + `.husky/post-checkout` are
+  version-controlled and activated by husky's `prepare` script, so `pnpm install` after a clone is all it
+  takes. They rebuild the CLI after merge/pull/branch-switch **when product source changed**
+  (`packages/{cli,core}/{src,scripts}/`); dogfood-only changes to `.trellis/` / `.claude/` skip the build.
+  (`core.hooksPath` is `.husky/_`, so git does not read `.git/hooks/` at all — a script that writes hooks
+  there would be a no-op.)
+- 🤖 **Self-CI (this repo's own git-workflow):** `.github/workflows/ci.yml` is the single CI for both
+  lines — it runs on PRs into `main` *and* `dev` with one step list (typecheck + lint + `test:coverage` +
+  build + build-output verification + diff-coverage ≥ 80%). It replaced an earlier `ci.yml` / `ci-dev.yml`
+  split whose steps had drifted (lint never ran on the feature→dev path). The `auto-merge` job is scoped
+  to `base_ref == 'dev'`, so `dev` auto-merges squash-when-green and `main` is merged deliberately;
+  `--delete-branch` + the weekly `prune-branches.yml` clean up `feature/*`. Both `main` and `dev` have
+  branch protection requiring the `verify` check. `publish.yml` no longer exists — it was retired
+  (`.trellis/tasks/archive/2026-07/07-08-retire-publish-workflow`) because this fork does not publish to npm.
+- ✋ No `npm i -g`, on any machine — see the source-install steps in §2. The symlink model above is the
+  only maintained path.
 
-**Test note:** `test/templates/trellis.test.ts` has **2 pre-existing failures** (missing
-`marketplace/workflows/{native,tdd}/workflow.md`). These files aren't tracked in the repo; the
-failures exist on a clean upstream clone too and are **unrelated to this fork's changes**. Everything
-else (1298 tests) passes.
+**Test baseline:** fully green — `pnpm test` runs 55 files, 1320 passed / 1 skipped, zero failures
+(matches `CLAUDE.md` → "baseline is FULLY GREEN"). Any failure you see is yours; don't attribute it
+to upstream.
 
 ## 5. Provenance / how it was built
 

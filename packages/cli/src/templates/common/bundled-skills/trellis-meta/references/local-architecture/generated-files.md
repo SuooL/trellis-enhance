@@ -71,8 +71,7 @@ Editable by default:
 
 Do not edit by default:
 
-- Global npm install directory
-- `node_modules/@mindfoldhq/trellis`
+- The CLI's own install location (the source clone its global symlink points at, or any `node_modules` copy of it)
 - Trellis GitHub repository source code
 - Concrete state files under `.trellis/.runtime/**`
 - Hash contents inside `.trellis/.template-hashes.json`
