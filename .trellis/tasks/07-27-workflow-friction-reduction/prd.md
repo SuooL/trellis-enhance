@@ -159,11 +159,17 @@ trellis-enhance 的四条自有流程在 dogfood 使用中主诉为**步骤太�
 
 ## 遗留待办（本批次发现，未在子任务 0 处理）
 
-- `CLAUDE.md` 声称测试有 2 个既有失败 —— **已过期**，实测 53 文件全绿。需修正。
-- `build_finish_prompt()` 的 `[finish]` 触发词疑似死代码：`workflow.md` 与各命令均未指示
-  dispatch prompt 含该字面量。判定需独立确认。
-- `git-workflow.md:40` 与 Pre-Dev Checklist 第 2 项仍要求手工 `set-base-branch dev`，
-  但 `git_branch.py:215-217` 已在 `after_create` 自动设好（实测确认）。归子任务 2。
+- ~~`CLAUDE.md` 声称测试有 2 个既有失败~~ —— **已修（2026-07-28）**。同批更正了
+  CLAUDE.md 中另外三处被本轮改动作废的说法：`mcp__*` 通配符、对抗审查的面板成本、
+  `after_archive` 号称会删除已合并分支（squash 场景下必然失效）。
+- ~~`build_finish_prompt()` 的 `[finish]` 疑似死代码~~ —— **已查证，决定保留（2026-07-28）**。
+  `[finish]` 确实只出现在两处 hook 的判定语句里，全仓无任何地方产生带该字面量的
+  dispatch prompt，因此经文档化路径不可达。但 `regression.test.ts:6074` 断言
+  hook 标记至少出现 3 次（implement / check / **finish** 各一），把它锚定为正当的
+  第三条路径。删除属行为变更且无摩擦收益（未走到的分支不耗运行时）。**不删。**
+- ~~`git-workflow.md:40` 与 Pre-Dev Checklist 第 2 项仍要求手工 `set-base-branch dev`~~
+  —— **已修（子任务 2）**：两处措辞改为「只在目标不是 dev 时才需要」，
+  Pre-Dev 清单同时由 4 项减为 2 项。
 - `_print_manual_pr_commands` 用 `subprocess.list2cmdline()` 渲染回退命令，
   该函数恒用 Windows 风格引号。当前输入（任务标题/分支名）不含 shell 元字符，风险低；
   若日后标题可能含 `"` / 反引号 / `$`，需换 POSIX 引号。仅登记，不急。
@@ -226,3 +232,19 @@ workflow 与 agent 定义互相矛盾，agent 可能只跑一套也可能两套�
 四条流程的改动**没有实质互相抵消**。发现的两处不一致都是「收窄了一处、漏了另一处」，
 而非方向冲突，均已修复。这两处都无法通过单个子任务内部的检查发现——
 它们只在把四轮改动放在一起看时才显形，集成回顾这一条验收标准是有价值的，不是走过场。
+
+---
+
+## 当前状态：blocked（2026-07-28）
+
+四条流程的可做部分全部完成并合入 `dev`（PR #3–#18）。集成回顾（验收标准第 5 条）已做，
+抓出并修复两处「收窄了一处、漏了另一处」的不一致。
+
+**唯一阻塞项**：子任务 3 的验收标准第 2 条 —— 跨模型审查**可被验证真实发生** ——
+无法在当前环境勾选。MCP 调用返回 401，根因是 CC switch 向 Claude Code 进程注入第三方
+`OPENAI_API_KEY`，而 `~/.codex/config.toml` 没有对应的 `[model_providers]` base URL 配置，
+于是第三方 key 被发往 `api.openai.com`。**属用户环境问题，Trellis 侧无可修之处。**
+
+解除条件：配好 codex 的 provider 后，拿一个含已知 bug 的 diff 实跑一次 `trellis-check`，
+确认报告首行声明的实际审查者是 Codex 而非 native fallback。届时勾选该条，
+归档子任务 3，父任务随之可归档。
