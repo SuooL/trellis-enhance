@@ -3,7 +3,7 @@
   "name": "git-workflow-repair",
   "title": "Git/CI 流程：修断裂步骤与失效清理，加逃生舱",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

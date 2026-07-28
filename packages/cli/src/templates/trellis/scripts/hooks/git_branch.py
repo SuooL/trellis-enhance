@@ -195,6 +195,7 @@ def cmd_create() -> None:
 
     branch = f"feature/{slug}"
 
+    forked_from_dev = False
     if _local_branch_exists(branch):
         # Branch exists but task.json didn't record it; just switch + persist.
         switch = _git("switch", branch)
@@ -204,6 +205,8 @@ def cmd_create() -> None:
         # remote), fall back to branching from the current HEAD.
         if _checkout_dev_base() is None:
             _warn(f"no {DEV_BRANCH} branch found — branching from current HEAD")
+        else:
+            forked_from_dev = True
         switch = _git("switch", "-c", branch)
 
     if switch.returncode != 0:
@@ -211,9 +214,17 @@ def cmd_create() -> None:
         return
 
     data["branch"] = branch
-    # Default the PR target to the integration branch when unset or still the
-    # template default (`main`).
-    if not data.get("base_branch") or data.get("base_branch") == "main":
+    # When we forked from `dev`, `dev` *is* the base — record it unconditionally.
+    #
+    # `cmd_create` seeds `base_branch` with whatever branch was checked out at the
+    # time, which is right for projects that branch off their current work but
+    # wrong here: creating several tasks back to back leaves each one pointing at
+    # the previous task's `feature/*` branch, and `task.py create-pr` then opens
+    # the PR against a sibling feature branch. The old guard only corrected an
+    # empty value or the literal `main`, so a `feature/*` seed survived.
+    if forked_from_dev:
+        data["base_branch"] = DEV_BRANCH
+    elif not data.get("base_branch") or data.get("base_branch") == "main":
         data["base_branch"] = DEV_BRANCH
     _write_task(data, path)
     print(f"[git_branch] created and switched to {branch} (base={data['base_branch']})")
