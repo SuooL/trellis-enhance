@@ -961,9 +961,11 @@ def cmd_create_pr(args: argparse.Namespace) -> int:
         "--head", branch,
         "--title", title,
     ]
-    body = _extract_prd_goal(target_dir)
-    if body:
-        gh_cmd += ["--body", body]
+    # `gh pr create` REQUIRES --body when it is not attached to a TTY, so this is
+    # always passed. An unfilled PRD skeleton ("TBD.") makes a useless body, so
+    # fall back to a pointer at the task instead of shipping the placeholder.
+    body = _extract_prd_goal(target_dir) or f"See `{_repo_relative_path(target_dir, repo_root)}/prd.md`."
+    gh_cmd += ["--body", body]
 
     if dry_run:
         print(colored("Dry run — nothing executed.", Colors.YELLOW))
