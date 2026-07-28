@@ -58,7 +58,7 @@ Precedence for the worker guard is: CLI flag > environment variable > `.trellis/
 
 ## Relationship To Other Local Layers
 
-- **Workflow layer**: workflows that use channel dispatch (such as `channel-driven-subagent-dispatch`) instruct the main agent to call `trellis channel spawn --agent check` or `--agent implement` instead of a platform sub-agent. If `.trellis/agents/check.md` or `implement.md` is missing, `trellis workflow --template <id>` prints a non-blocking warning at install time. Restore them with `trellis update` if they are deleted by accident.
+- **Workflow layer**: marketplace workflows that use channel dispatch instruct the main agent to call `trellis channel spawn --agent check` or `--agent implement` instead of a platform sub-agent. If `.trellis/agents/check.md` or `implement.md` is missing, `trellis workflow --template <id>` prints a non-blocking warning at install time. Restore them with `trellis update` if they are deleted by accident.
 - **Task layer**: channel workers do not own task state. The supervising main session passes the active task path through the worker inbox; the worker resolves task artifacts from disk.
 - **Spec layer**: workers read `.trellis/spec/` the same way the main session does. Channel runtime does not bypass spec context loading.
 - **Platform integration layer**: channel runtime is platform-neutral. It does not depend on `.claude/`, `.codex/`, or any other platform directory. The adapters that normalize provider output (Claude `stream-json`, Codex `app-server`) live inside the Trellis CLI binary, not in the project.

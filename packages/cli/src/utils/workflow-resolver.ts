@@ -16,6 +16,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { PATHS } from "../constants/paths.js";
 import { workflowMdTemplate } from "../templates/trellis/index.js";
 import {
   TIMEOUTS,
@@ -38,6 +39,48 @@ import {
  * design.md "Durable-state contract").
  */
 export const NATIVE_WORKFLOW_ID = "native";
+
+/**
+ * Record which workflow template is active in `.trellis/.workflow-template`.
+ *
+ * Why a marker file and not just "workflow.md has no hash entry": a missing
+ * hash entry is ambiguous. It means either "the user selected a non-native
+ * workflow" (drop it from updates) or "this project predates hash-tracking for
+ * workflow.md" (still wants updates). Skipping updates on that ambiguity would
+ * silently freeze workflow.md for legacy projects — a worse failure than the
+ * prompt it replaces. The marker states the fact explicitly.
+ *
+ * Native writes no marker (and clears a stale one), so absence == native. This
+ * keeps `trellis init` output unchanged for the default path.
+ */
+export function writeActiveWorkflowId(cwd: string, templateId: string): void {
+  const markerPath = path.join(cwd, PATHS.WORKFLOW_TEMPLATE_FILE);
+  if (templateId === NATIVE_WORKFLOW_ID) {
+    fs.rmSync(markerPath, { force: true });
+    return;
+  }
+  fs.writeFileSync(markerPath, `${templateId}\n`, "utf-8");
+}
+
+/**
+ * Read the active workflow template id, or `null` when the marker is absent
+ * (i.e. the bundled native workflow, or a project that never switched).
+ */
+export function readActiveWorkflowId(cwd: string): string | null {
+  const markerPath = path.join(cwd, PATHS.WORKFLOW_TEMPLATE_FILE);
+  if (!fs.existsSync(markerPath)) return null;
+  const id = fs.readFileSync(markerPath, "utf-8").trim();
+  return id.length > 0 ? id : null;
+}
+
+/**
+ * True when the project runs a user-selected non-native workflow, i.e. when
+ * `trellis update` must not seed native `workflow.md` bytes over it.
+ */
+export function hasNonNativeWorkflow(cwd: string): boolean {
+  const id = readActiveWorkflowId(cwd);
+  return id !== null && id !== NATIVE_WORKFLOW_ID;
+}
 
 /**
  * Resolved workflow template entry.

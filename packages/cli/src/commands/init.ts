@@ -40,6 +40,7 @@ import { initializeHashes, removeHash } from "../utils/template-hash.js";
 import {
   NATIVE_WORKFLOW_ID,
   resolveWorkflowTemplate,
+  writeActiveWorkflowId,
 } from "../utils/workflow-resolver.js";
 import {
   isCwdHomedir,
@@ -1987,6 +1988,11 @@ export async function init(options: InitOptions): Promise<void> {
   // "Durable-state contract".
   if (workflowMdOverride !== undefined && workflowId !== NATIVE_WORKFLOW_ID) {
     removeHash(cwd, PATHS.WORKFLOW_GUIDE_FILE);
+  }
+  // Record the active template id (native clears the marker) so `trellis
+  // update` can skip a non-native workflow.md instead of re-prompting forever.
+  if (workflowMdOverride !== undefined) {
+    writeActiveWorkflowId(cwd, workflowId);
   }
 
   // Initialize developer identity (silent - no output)

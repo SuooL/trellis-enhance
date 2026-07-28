@@ -169,9 +169,9 @@ During development:
 During release:
 
 - `bump-versions.js` updates both package versions together.
-- `verify-packed-cli` confirms pnpm rewrote `workspace:*` to the exact release version in the packed CLI artifact.
-- CI publishes core first, then CLI.
-- CI verifies both packages are visible on public npm.
+- `release-preflight check-versions` confirms the two versions match **and** that the CLI still
+  reaches core through `workspace:*` rather than a version range.
+- Nothing is published. The `v<version>` tag on `main` is the whole release artifact.
 
 Release/versioning details live in `release-process.md`.
 

@@ -8,7 +8,8 @@
 > 👉 **Background, customization catalog, dev-loop & maintenance:** see **[FORK.md](./FORK.md)** · quick context auto-loads from **[CLAUDE.md](./CLAUDE.md)**.
 > Dev = symlink install; edit → `pnpm --filter trellis-enhance build` → live (never reinstall).
 >
-> _The original upstream README follows unchanged._
+> _The upstream README follows, with the install/badge/platform-count sections corrected for this fork
+> (source install, no npm package)._
 
 <hr/>
 
@@ -34,16 +35,13 @@
 </p>
 
 <p align="center">
-<a href="https://www.npmjs.com/package/@mindfoldhq/trellis"><img src="https://img.shields.io/npm/v/@mindfoldhq/trellis.svg?style=flat-square&color=2563eb" alt="npm version" /></a>
-<a href="https://www.npmjs.com/package/@mindfoldhq/trellis"><img src="https://img.shields.io/npm/dw/@mindfoldhq/trellis?style=flat-square&color=cb3837&label=downloads" alt="npm downloads" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-16a34a.svg?style=flat-square" alt="license" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/stargazers"><img src="https://img.shields.io/github/stars/mindfold-ai/Trellis?style=flat-square&color=eab308" alt="stars" /></a>
+<a href="https://github.com/SuooL/trellis-enhance/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-16a34a.svg?style=flat-square" alt="license" /></a>
+<a href="https://github.com/SuooL/trellis-enhance/stargazers"><img src="https://img.shields.io/github/stars/SuooL/trellis-enhance?style=flat-square&color=eab308" alt="stars" /></a>
 <a href="https://docs.trytrellis.app/"><img src="https://img.shields.io/badge/docs-trytrellis.app-0f766e?style=flat-square" alt="docs" /></a>
 <a href="https://discord.com/invite/tWcCZ3aRHc"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/issues"><img src="https://img.shields.io/github/issues/mindfold-ai/Trellis?style=flat-square&color=e67e22" alt="open issues" /></a>
-<a href="https://github.com/mindfold-ai/Trellis/pulls"><img src="https://img.shields.io/github/issues-pr/mindfold-ai/Trellis?style=flat-square&color=9b59b6" alt="open PRs" /></a>
-<a href="https://deepwiki.com/mindfold-ai/Trellis"><img src="https://img.shields.io/badge/Ask-DeepWiki-blue?style=flat-square" alt="Ask DeepWiki" /></a>
-<a href="https://chatgpt.com/?q=Explain+the+project+mindfold-ai/Trellis+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
+<a href="https://github.com/SuooL/trellis-enhance/issues"><img src="https://img.shields.io/github/issues/SuooL/trellis-enhance?style=flat-square&color=e67e22" alt="open issues" /></a>
+<a href="https://github.com/SuooL/trellis-enhance/pulls"><img src="https://img.shields.io/github/issues-pr/SuooL/trellis-enhance?style=flat-square&color=9b59b6" alt="open PRs" /></a>
+<a href="https://chatgpt.com/?q=Explain+the+project+SuooL/trellis-enhance+on+GitHub"><img src="https://img.shields.io/badge/Ask-ChatGPT-74aa9c?style=flat-square&logo=openai&logoColor=white" alt="Ask ChatGPT" /></a>
 </p>
 
 <p align="center">
@@ -58,7 +56,7 @@
 | **Task-centered workflow** | Keep PRDs, implementation context, review context, and task status in `.trellis/tasks/` so AI work stays structured. |
 | **Project memory** | Journals in `.trellis/workspace/` preserve what happened last time, so each new session starts with real context. |
 | **Team-shared standards** | Specs live in the repo, so one person's hard-won workflow or rule can benefit the whole team. |
-| **Multi-platform setup** | Bring the same Trellis structure to 16 AI coding platforms instead of rebuilding your workflow per tool. |
+| **Multi-platform setup** | Bring the same Trellis structure to 17 AI coding platforms instead of rebuilding your workflow per tool. |
 
 ## Prerequisites:
 
@@ -67,9 +65,17 @@
 
 ## Quick Start
 
+`trellis-enhance` is **not published to any npm registry** — it is installed from source and the
+global `trellis` / `tl` command is symlinked to this repo's build, so a rebuild is instantly live
+(see [CLAUDE.md → How install works](./CLAUDE.md)).
+
 ```bash
-# 1. Install Trellis
-npm install -g @mindfoldhq/trellis@latest
+# 1. Install Trellis-Enhance from source (one time)
+git clone https://github.com/SuooL/trellis-enhance.git
+cd trellis-enhance
+pnpm install                                  # also installs the husky hooks
+pnpm --filter trellis-enhance build           # tsc + copy-templates → dist/
+cd packages/cli && pnpm link --global         # provides the `trellis` / `tl` commands
 
 # 2. Initialize in your repo
 trellis init -u your-name
@@ -77,6 +83,9 @@ trellis init -u your-name
 # 3. Or initialize with the platforms you actually use
 trellis init --cursor --opencode --codex -u your-name
 ```
+
+To pick up new work later: `git pull` inside the clone — the husky `post-merge` hook rebuilds the
+CLI automatically when product source changed, so there is never anything to reinstall.
 
 See the [Quick Start](https://docs.trytrellis.app/start/install-and-first-task) and [Supported Platforms](https://docs.trytrellis.app/advanced/multi-platform) guides for setup details.
 
