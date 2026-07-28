@@ -163,7 +163,16 @@ Concrete edit list for the standard flow (post-`docs-promote.sh`, both languages
 
 ### First dual-package GA promote
 
-0.6.0 was the first GA where both `@mindfoldhq/trellis` (CLI) and `@mindfoldhq/trellis-core` (SDK) ship in lockstep. `bump-versions.js promote` rewrites both `package.json` files and the CLI's `dependencies["@mindfoldhq/trellis-core"]` from `workspace:*` to the exact version at release time. `release-preflight verify-packed-cli` exists specifically to catch a divergence here — always run it before `pnpm release:promote`.
+0.6.0 was the first GA where both `@mindfoldhq/trellis` (CLI) and `@mindfoldhq/trellis-core` (SDK) shipped in lockstep — **upstream history; this fork does not follow it.**
+
+> ⚠️ This paragraph previously claimed `bump-versions.js promote` rewrites the CLI's
+> `dependencies["@mindfoldhq/trellis-core"]` from `workspace:*` to an exact version, and told you to
+> run `release-preflight verify-packed-cli` before `pnpm release:promote`. All three are wrong here:
+> `bump-versions.js` only writes `.version` into the two `package.json` files and never touches the
+> dependency; `verify-packed-cli` and `release:promote` were removed on 2026-07-28. In this fork the
+> dependency **must stay `workspace:*`** — `check-versions` fails the release if it is anything else,
+> because upstream publishes a package under that same name. See
+> `.trellis/spec/cli/backend/release-process.md` → "Version invariants".
 
 ### Stale navbar Changelog `href` gotcha
 

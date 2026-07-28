@@ -15,11 +15,7 @@
     "release": "pnpm --filter trellis-enhance release",
     "release:minor": "pnpm --filter trellis-enhance release:minor",
     "release:major": "pnpm --filter trellis-enhance release:major",
-    "release:beta": "pnpm --filter trellis-enhance release:beta",
-    "release:rc": "pnpm --filter trellis-enhance release:rc",
-    "release:promote": "pnpm --filter trellis-enhance release:promote",
-    "release:check": "node packages/cli/scripts/release-preflight.js check-versions",
-    "release:plan": "node packages/cli/scripts/release-preflight.js publish-plan"
+    "release:check": "node packages/cli/scripts/release-preflight.js check-versions"
   },
   "devDependencies": {
     "husky": "^9.1.7",

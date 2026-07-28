@@ -357,12 +357,9 @@ async function main() {
     console.log("\nManifest content:");
     console.log(JSON.stringify(manifest, null, 2));
 
-    // Detect release type for next steps hint
-    const releaseCmd = version.includes("-beta.") ? "pnpm release:beta" : version.includes("-rc.") ? "pnpm release:rc" : "pnpm release";
-
     console.log("\n📋 Next steps:");
     console.log(`  1. Edit ${version}.json if needed (add migrations, migrationGuide, etc.)`);
-    console.log(`  2. ${releaseCmd}`);
+    console.log(`  2. Promote dev -> main by PR, then on main: pnpm release`);
   } finally {
     rl.close();
   }
