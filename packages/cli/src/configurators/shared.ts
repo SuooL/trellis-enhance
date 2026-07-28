@@ -256,7 +256,7 @@ const SKILL_DESCRIPTIONS: Record<string, string> = {
   "adversarial-review":
     'Multi-role, dual-model adversarial + constructive review of a plan, design, doc, or open question. Two independent expert panels (native + Codex GPT-5.5) run separately and their divergences are contrasted. Use ONLY when the user explicitly asks for an adversarial or red-team review — 对抗性审查 / 批判性审查 / adversarial review / red-team / 让专家评审 — or invokes the question command. Do NOT trigger on casual phrasing like "what do you think", "take another look", or a plain request to find bugs in code: reviewing a code diff is `trellis-check`\'s job, and this skill costs an extra model call.',
   question:
-    "Explicit entry point for a multi-role, dual-model adversarial + constructive review of a plan, design, code, doc, or open question. Loads the trellis-adversarial-review skill and runs two independent expert panels (native + Codex GPT-5.5), then contrasts the divergences. Use when the user invokes this command.",
+    "Explicit entry point for a multi-role, dual-model adversarial + constructive review of a plan, design, doc, or open question. Loads the trellis-adversarial-review skill and runs two independent expert panels (native + Codex GPT-5.5), then contrasts the divergences. Use when the user invokes this command. For reviewing a code diff, `trellis-check` is the right tool.",
 };
 
 /**
