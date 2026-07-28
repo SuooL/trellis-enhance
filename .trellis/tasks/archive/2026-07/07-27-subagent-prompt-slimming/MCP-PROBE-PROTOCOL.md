@@ -103,7 +103,15 @@ MCP 通路若可用，作为第二道保险保留；不可用则纯走 Bash。
   （context7 查文档、web 搜索、zotero 等）。收窄成 `mcp__codex__*` 是**能力倒退**。
   但若 `mcp__*` 本来就一个都拿不到，那它今天已经是坏的，收窄反而是净改善。
 
-**待定**：research agent 要放弃「任意 MCP」的设计、枚举常见 server、还是保持 `mcp__*` 等平台支持？
+**已决（2026-07-28 回填）**：**枚举 server + server-scoped 通配符**。裸 `mcp__*` 全部去掉，
+`trellis-research` 的 `tools:` 改为逐个点名 server 并在 server 内用通配符
+（`mcp__codex__codex`、`mcp__plugin_context7_context7__*`、`mcp__zotero-mcp__*`、
+`mcp__plugin_chrome-devtools-mcp_chrome-devtools__*`）。
+
+理由：上方追加实验已证明**命名不存在的 server 是无害的**（条目被丢弃，agent 照常注册），
+所以枚举不会因为用户没装某个 server 而炸掉 —— 这正是原先不敢枚举的顾虑。于是
+「任意 MCP」的能力损失被限制在「用户装了我们没列的 server」这一种情况，
+代价远小于裸 `mcp__*` 导致的**零工具**。7 处已全部落地，现仓内裸 `mcp__*` 零残留。
 
 ## 收尾（实验做完后）
 
