@@ -1,73 +1,76 @@
-# Adversarial Review (multi-role · dual independent panels)
+# Adversarial Review (multi-role · two independent panels)
 
-Critical **and** constructive review of a target (a plan, design, code, doc, or open question) by multiple expert roles, run as **two independent panels** — one on **Opus 4.8**, one on **Codex GPT-5.5** — whose divergences are then contrasted. Different models catch different failure modes; the divergences are the signal.
+Critical **and** constructive review of a target (a plan, design, code, doc, or open
+question) by two independent panels — one native (this session), one **Codex GPT-5.5**.
+Different models catch different failure modes; **the divergences are the signal**.
 
-This is an on-demand capability. It is NOT tied to the task lifecycle — run it on anything, any time the user asks for a critical/adversarial review or a second opinion.
+On-demand only. Not tied to the task lifecycle.
 
 ---
 
-## Step 1: Establish the target + the roles
+## Step 1: Target + roles
 
-**Target**: identify what is being reviewed. If the user gave a question/topic, use it. If they pointed at files/a diff/a doc, read those first so the panels review real content, not a summary.
+**Target** — if the user pointed at files / a diff / a doc, read them first so the panels
+review real content, not a summary.
 
-**Roles** (two sources):
-- **User-specified** — if the user named roles/lenses ("review as a security expert and a DB architect"), use exactly those.
-- **Auto-discovered** — otherwise, derive 2–5 of the most relevant expert lenses for this target (e.g. security, performance, correctness, maintainability, domain expert, UX, ops/reliability). List them with a one-line focus each, and briefly tell the user which roles you picked before proceeding.
+**Roles** — use exactly the roles the user named. Otherwise pick **2–3** relevant expert
+lenses (security, performance, correctness, maintainability, domain, ops…). Name them in
+one line before proceeding. More lenses mostly produce more overlap, not more insight.
 
-## Step 2: Run two independent panels
+## Step 2: Two independent panels
 
-For the chosen roles, run the critique **twice, independently** — the panels must not see each other's output (independence is what creates diversity):
+Independence is the point — do not feed one panel's findings into the other.
 
-**Panel A — Opus 4.8 (native).** In this session (Opus), for each role, produce a critical + constructive review: concrete weaknesses/risks/bugs (severity + specifics), and constructive improvements. Cite real locations/quotes from the target.
+**Panel A — native.** In this session, review through each role: concrete weaknesses,
+risks and bugs (with severity and specifics), plus constructive fixes. Cite real
+locations/quotes from the target.
 
-**Panel B — Codex GPT-5.5.** Delegate to Codex once per role (or once with all roles clearly separated), independently:
+**Panel B — Codex GPT-5.5.** Exactly **one** call, with all roles in the same prompt:
+
 ```
 mcp__codex__codex(
   model = "gpt-5.5",
   config = { "model_reasoning_effort": "high" },
   sandbox = "read-only",
   cwd = <repo root>,
-  prompt = <the target content (paste it — Codex has no context injection) + the role(s) + "Give a critical AND constructive review: concrete weaknesses, risks, bugs, with severity and specifics, plus constructive fixes. Cite specifics.">
+  prompt = <target content, pasted — Codex gets no session context>
+         + <the roles, clearly separated>
+         + "Give a critical AND constructive review per role: concrete weaknesses,
+            risks, bugs, with severity and specifics, plus constructive fixes."
 )
 ```
-Paste the actual target content into the Codex prompt — Codex does not receive Trellis/session context automatically.
 
-If Codex is unreachable, note it and proceed with Panel A only (single-model review), clearly flagged.
+One call per role would multiply cost and re-paste the whole target N times for no real
+gain — the roles are separable inside a single prompt.
 
-## Step 3: Contrast + synthesize
+If Codex is unavailable, **say so in the output** and proceed with Panel A alone. A
+single-model review presented as a dual-model one is worse than no review, because the
+caller trusts it more than they should.
 
-Merge both panels and **foreground the divergences** — a point raised by one model but not the other, or where the two disagree, is often the real issue or a genuine judgment split. Produce:
-- **Consensus issues** — flagged by both panels (high confidence).
-- **Divergences** — raised by only one model, or conflicting conclusions (needs human judgment; say why they differ if you can).
-- **Constructive recommendations** — prioritized (blocker → major → minor).
+## Step 3: Contrast
 
-## Step 4: Persist the report
+Foreground the **divergences** — a point raised by one panel and not the other, or where
+the two disagree, is usually either the real issue or a genuine judgment call.
 
-Write the report to a file (files outlive the conversation):
-- Inside an active task → `{TASK_DIR}/review/<topic-slug>.md` (create `review/` if needed).
-- Standalone → `.trellis/workspace/<developer>/reviews/<YYYY-MM-DD>-<topic-slug>.md` (or a user-specified path).
+- **Consensus** — both panels flagged it (high confidence).
+- **Divergence** — one panel only, or conflicting (needs your judgment; explain why they
+  differ if you can).
+- **Recommendations** — prioritized: blocker → major → minor.
 
-Report structure:
-```markdown
-# Adversarial Review: <topic>
-- Target: <what was reviewed>
-- Roles: <roles + source: user-specified / auto-discovered>
-- Models: Opus 4.8 + Codex GPT-5.5 (high)
+## Step 4: Deliver it where it belongs
 
-## Consensus issues (both panels — high confidence)
-## Divergences (one panel only / conflicting — needs judgment)
-## Constructive recommendations (prioritized)
-## Per-role detail (collapsible)
-### <role> — Opus panel
-### <role> — Codex panel
-```
+Match the output to the target:
 
-Then reply with the file path + a short summary (top consensus issues + key divergences). Do not paste the full report into chat — the file is the deliverable.
+- **Inside an active task, or a review worth keeping** → write
+  `{TASK_DIR}/review/<topic-slug>.md` (or
+  `.trellis/workspace/<developer>/reviews/<YYYY-MM-DD>-<topic-slug>.md` when standalone),
+  then reply with the path plus the top consensus issues and key divergences.
+- **A short question with a short answer** → just answer, in chat. Forcing a file and a
+  second lookup for something that fits in a paragraph is pure overhead.
+
+State which panels actually ran (both, or native-only and why) wherever the result lands.
 
 ---
 
-## Notes
-
-- Distinct from `trellis-check`: check is a task-internal code-quality gate on a diff; this is a general critical review of any target (plans, designs, code, questions).
-- Keep the two panels genuinely independent — do not feed Panel A's findings into Panel B's prompt.
-- Codex delegation details: see the project's Codex usage conventions (model `gpt-5.5`, `model_reasoning_effort` via `config`, `sandbox: read-only` for review).
+Distinct from `trellis-check`: check is a task-internal quality gate on a code diff. This
+reviews any target — plans, designs, docs, open questions — and is only ever run on request.

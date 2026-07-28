@@ -294,7 +294,7 @@ When a user request matches one of these intents inside an active task, route fi
 - Planning or unclear requirements -> `trellis-brainstorm`.
 - `in_progress` implementation/check -> dispatch `trellis-implement` / `trellis-check`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
-- Critical / adversarial review of a plan, design, code, or question -> `trellis-adversarial-review` (or `/trellis:question`).
+- Explicitly requested adversarial / red-team review of a plan, design, or open question -> `trellis-adversarial-review` (or `/trellis:question`). Reviewing a code diff is `trellis-check`, not this.
 
 [/Claude Code, Cursor, OpenCode, codex-sub-agent, Kiro, Gemini, Qoder, CodeBuddy, Copilot, Droid, Pi, ZCode, Reasonix, Trae]
 
@@ -303,7 +303,7 @@ When a user request matches one of these intents inside an active task, route fi
 - Planning or unclear requirements -> `trellis-brainstorm`.
 - Before editing -> `trellis-before-dev`; after editing -> `trellis-check`.
 - Repeated debugging -> `trellis-break-loop`; spec updates -> `trellis-update-spec`.
-- Critical / adversarial review of a plan, design, code, or question -> `trellis-adversarial-review` (or `/trellis:question`).
+- Explicitly requested adversarial / red-team review of a plan, design, or open question -> `trellis-adversarial-review` (or `/trellis:question`). Reviewing a code diff is `trellis-check`, not this.
 
 [/codex-inline, Kilo, Antigravity, Devin]
 

@@ -163,14 +163,20 @@ describe.skipIf(!hasPython())("task.py create-pr", () => {
     expect(git(tmp, "branch", "-r")).toBe("");
   });
 
-  it("omits --body when the PRD goal is still the unfilled skeleton", () => {
+  it("falls back to a task pointer when the PRD goal is the unfilled skeleton", () => {
     makeTask(tmp, "seed-task", { goal: "TBD." });
     git(tmp, "switch", "-q", "-c", "feature/seed-task");
 
     const { status, out } = runCreatePr(tmp, ["seed-task", "--dry-run"]);
 
     expect(status).toBe(0);
-    expect(out).not.toContain("--body");
+    // `gh pr create` requires --body when not attached to a TTY, so it must
+    // always be present — omitting it made the real (non-dry-run) call fail
+    // with "must provide `--title` and `--body`". The placeholder itself is
+    // still not worth shipping as a PR description.
+    expect(out).toContain("--body");
+    expect(out).not.toContain("TBD.");
+    expect(out).toContain("prd.md");
   });
 
   it("refuses when checked out on a different branch than the task's", () => {
