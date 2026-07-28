@@ -125,8 +125,10 @@ trellis-enhance 的四条自有流程在 dogfood 使用中主诉为**步骤太�
 
 ## 跨子任务验收标准
 
-1. 四个子任务各自独立通过 `pnpm --filter trellis-enhance typecheck` 与 `test`
-   （已知 2 个既有失败在 `test/templates/trellis.test.ts`，属环境问题，不计入回归）。
+1. 四个子任务各自独立通过 `pnpm --filter trellis-enhance typecheck` 与 `test`。
+   ~~已知 2 个既有失败~~ —— **该说法自始就是错的**：2026-07-27 实测基线为
+   53 文件全绿 / 1299 passed / 0 failed。CLAUDE.md 沿用的这句描述已过期，
+   本 PRD 原样抄了下来。基线干净，因此本批次出现的任何失败都是本批次引入的。
 2. 每个子任务完成后，在 scratch 目录跑一次 `trellis init --claude -y` 冒烟，
    确认生成产物无缺失、无语法错误。
 3. **可度量的减重**：记录改动前后 `workflow.md` 与三个 agent 模板的行数，
@@ -169,3 +171,58 @@ trellis-enhance 的四条自有流程在 dogfood 使用中主诉为**步骤太�
 ## 待定（需在各子任务规划阶段确认）
 
 - 是否收缩 14 平台变体块的维护范围（这是产品决策，不是摩擦修复，本次审计不预设立场）。
+
+---
+
+## 集成回顾（验收标准第 5 条 · 2026-07-28）
+
+四条流程的改动落在若干重叠文件上（`workflow.md` 被子任务 0/1/4 各改一次，
+`shared.ts` 被 3/4 各改一次），逐处核对是否互相抵消。
+
+### 查了三处交叉点，两处发现真问题
+
+| 交叉点 | 结论 |
+|---|---|
+| 2.2「最后一次必须全量」 vs check 的 docs-only 档 | **不冲突**。前者管范围（所有受影响的包），后者管深度（不动执行代码就不跨模型审），二者正交。 |
+| `question` 命令 vs `adversarial-review` skill 的适用范围 | **冲突**。子任务 4 把 skill 收窄为「plan / design / doc / question」并明写审代码 diff 归 `trellis-check`，但加载它的 `question` 命令描述仍写着 code。同一能力两个入口说法不一致。**已修。** |
+| 轻量档豁免 vs 步骤 1.3 自身的措辞 | **冲突，且抵消了子任务 1 的修复**。ready gate 已限定 complex，但 1.3 仍标 `[required · once]`，开场白写「your job here is to fill in real entries」，限定词在 40 行之后。读到这一步的人会照做，根本走不到限定。**已修**：标记改为 `[required · once · complex tasks]`，开场白首句即声明轻量任务跳过。 |
+
+agent 提示词的 fallback 会读 seed-only jsonl，但消费方跳过 seed 行，是空转而非矛盾，不算冲突。
+
+### 可度量的变化（验收标准第 3 条）
+
+| 文件 | 改前 | 改后 |
+|---|---|---|
+| `trellis-implement.md` | 111 | **51**（-54%）|
+| `trellis-research.md` | 148 | **90**（-39%）|
+| `trellis-check.md` | 116 | 126（**+9%**）|
+| 三个 agent 合计 | 375 | **267**（-29%）|
+| `workflow.md` | 746 | 749（+3）|
+| `adversarial-review.md` | 73 | 76（+3）|
+
+**行数不是这轮的成果，如实记录。** `check` 与 `adversarial-review` 都变长了——
+前者换来 docs-only 分档、失败预算与显式降级声明，后者换来「为何只调一次」的理由
+（防止被好心改回去）。`workflow.md` 基本持平：删掉的重复被补回的限定词抵消了。
+
+真正的变化在**人的动作数与调用成本的确定性**：
+
+| 项 | 改前 | 改后 |
+|---|---|---|
+| 轻量任务的规划 | 手工整理 2 个 JSONL manifest | 跳过 |
+| Pre-Dev 清单 | 4 项手工核对 | 2 项 |
+| Quality Check | 6 项（含本地无法验证的 diff coverage）| 3 项 |
+| Phase 3 的 spec 判断 | 3.3 与 3.4 各一次 | 一次 |
+| 开 PR | 手工 push + 手工设 base + 一条不存在的命令 | `create-pr` 一条 |
+| 对抗审查的 Codex 调用 | **1–5 次不可预测** | **恒定 1 次** |
+| check 的 Codex 失败重试 | 无上限 | 1 次 |
+| check 的验证循环 | 「until green」无上限 | 3 轮 |
+
+**「一次典型 check 的模型调用跳数」无法给出改前的可信数字** —— 因为改前 hook 注入的
+workflow 与 agent 定义互相矛盾，agent 可能只跑一套也可能两套都跑，行为本身不确定。
+不确定性正是被修掉的东西；给一个精确的改前数字反而是编造。
+
+### 结论
+
+四条流程的改动**没有实质互相抵消**。发现的两处不一致都是「收窄了一处、漏了另一处」，
+而非方向冲突，均已修复。这两处都无法通过单个子任务内部的检查发现——
+它们只在把四轮改动放在一起看时才显形，集成回顾这一条验收标准是有价值的，不是走过场。
