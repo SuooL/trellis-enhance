@@ -37,6 +37,8 @@ export const FILE_NAMES = {
   PRD: "prd.md",
   /** Workflow guide */
   WORKFLOW_GUIDE: "workflow.md",
+  /** Active workflow template id (absent = bundled native) */
+  WORKFLOW_TEMPLATE: ".workflow-template",
   /** Journal file prefix */
   JOURNAL_PREFIX: "journal-",
 } as const;
@@ -61,6 +63,8 @@ export const PATHS = {
   CURRENT_TASK_FILE: `${DIR_NAMES.WORKFLOW}/${FILE_NAMES.CURRENT_TASK}`,
   /** .trellis/workflow.md */
   WORKFLOW_GUIDE_FILE: `${DIR_NAMES.WORKFLOW}/${FILE_NAMES.WORKFLOW_GUIDE}`,
+  /** .trellis/.workflow-template */
+  WORKFLOW_TEMPLATE_FILE: `${DIR_NAMES.WORKFLOW}/${FILE_NAMES.WORKFLOW_TEMPLATE}`,
 } as const;
 
 /**
