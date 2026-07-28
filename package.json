@@ -9,6 +9,7 @@
     "test": "pnpm --filter @mindfoldhq/trellis-core test && pnpm --filter trellis-enhance test",
     "test:core": "pnpm --filter @mindfoldhq/trellis-core test",
     "test:cli": "pnpm --filter trellis-enhance test",
+    "test:coverage": "pnpm --filter @mindfoldhq/trellis-core test:coverage && pnpm --filter trellis-enhance test:coverage",
     "lint": "pnpm --filter @mindfoldhq/trellis-core lint && pnpm --filter trellis-enhance lint",
     "typecheck": "pnpm --filter @mindfoldhq/trellis-core build && pnpm --filter trellis-enhance typecheck",
     "release": "pnpm --filter trellis-enhance release",
