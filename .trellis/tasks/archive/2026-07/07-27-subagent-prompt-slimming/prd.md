@@ -118,29 +118,64 @@ agent（`claude/agents/trellis-check.md`，116 行，Codex 委托流）
 `SKILL_DESCRIPTIONS`，与子任务 1 的 workflow.md 改动直接冲突，并行做会互相覆盖。
 已在子任务 1 的范围内登记。
 
-**本任务被 blocked 的原因**：验收标准第 2 条（跨模型审查**可被验证真实发生**）
-无法在当前环境勾选 —— MCP 调用仍返回 401，根因是 CC switch 向 Claude Code 进程注入
-第三方 `OPENAI_API_KEY` 而 `~/.codex/config.toml` 没有对应的 `[model_providers]`
-base URL 配置。**属用户环境问题，不是 Trellis 代码缺陷**，Trellis 侧无可修之处。
+**阻塞已解除（2026-07-28）——「Trellis 侧无可修之处」的判断是对的，且不需要任何修法。**
 
-解除条件：用户配好 codex 的 provider 后，用一个含已知 bug 的 diff 实跑 `trellis-check`，
-确认拿到的是 Codex 的 findings（报告首行会声明实际审查者）。届时勾选该条并归档。
+原判断：MCP 调用 401，根因是 CC switch 向进程注入第三方 `OPENAI_API_KEY`，而
+`~/.codex/config.toml` 无对应 `[model_providers]` base URL。属用户环境问题。
+
+实测结论：**当前会话环境里根本没有 `OPENAI_API_KEY`**，ChatGPT 登录凭据在位，
+裸调 `mcp__codex__codex` 直接返回结果；`model=gpt-5.5` + `xhigh` + `read-only`
+（`trellis-check` 用的完全相同的调用形状）同样通过。401 是**环境态**，随注入方消失而消失，
+不是需要配置去绕开的常态。
+
+期间为「让它在有注入时也能跑」探索的项目内 endpoint 配置（`.trellis/config.yaml` 的
+`codex.review_config` + 模板文档）**已撤回**，理由是定位错误：Codex 走哪个中转端点、
+密钥放哪，是开发者机器的环境配置，不是每个 `trellis init` 出来的项目都需要的产品能力。
+把它做进模板等于把一个人的代理端点问题固化进发给所有人的 CLI。改动存于
+`git stash`（"codex review_config endpoint override"），**不建议 pop**——其中
+「`api_key = "sk-..."`」一句已被实测证伪。
+
+顺带测出的 codex-cli 0.145.0 事实（若日后确有此需求，直接可用，不必重测）：
+provider 的凭据字段**只有 `env_key` 可用**；`api_key` 字面量与 `http_headers`
+均 401。且 provider 可完全由 `-c model_providers.<name>.*` 逐次传入，
+`~/.codex/config.toml` 里不需要有这个 provider。
+
+验证证据：植入 `isNewerVersion` 的 `>=` vs `>` 边界 bug 后实跑 `trellis-check`，
+报告首行为 `Reviewer: Codex GPT-5.5 (xhigh)`，首次调用即成功，精确命中该 bug
+（另报出无调用方、无测试两项）。夹具已还原。
 
 未动：其余 5 个平台的 agent 变体（内容本就各异，不在本次范围）。
 
 ## Acceptance Criteria
 
-- [ ] `MCP-PROBE-PROTOCOL.md` 的实验已在新会话完成，结论已回填。
-- [ ] `trellis-check` 的跨模型审查**可被验证真实发生**：给定一个含已知 bug 的 diff，
+全部于 2026-07-28 逐条实测核实（不接受「代码看起来对」）：
+
+- [x] `MCP-PROBE-PROTOCOL.md` 的实验已在新会话完成，结论已回填。
+      最后一处「待定」（research 的「任意 MCP」语义）已于本日回填为已决。
+- [x] `trellis-check` 的跨模型审查**可被验证真实发生**：给定一个含已知 bug 的 diff，
       能拿到 Codex 的具体 findings（而非 Claude 自查结果）。需实跑证明，不接受「代码看起来对」。
-- [ ] 无 `codex` 时降级为原生自查，且报告中**显式声明**跨模型审查未发生及原因（不再静默）。
-- [ ] 7 处 `mcp__*` 按实验结论处置完毕；research agent 的「任意 MCP」语义有明确决定。
-- [ ] 轻量档有可机器判定的边界，并有测试覆盖其判定逻辑。
-- [ ] 三个 agent 模板行数明显下降（记录改动前后数值）；`trellis-research.md` 的
+      → 植入 `isNewerVersion` 的 `>=` vs `>` 边界 bug，实跑报告首行
+      `Reviewer: Codex GPT-5.5 (xhigh)`，首次调用即成功并精确命中。夹具已还原。
+- [x] 无 `codex` 时降级为原生自查，且报告中**显式声明**跨模型审查未发生及原因（不再静默）。
+      → 模板已写入，并由新增回归测试钉死（断言 `**Reviewer**` 与 `native self-review` 均在位）。
+      **限度**：本次 Codex 可用，故降级路径本身未被运行时触发，验证止于「契约在位且不可被静默删除」。
+- [x] 7 处 `mcp__*` 按实验结论处置完毕；research agent 的「任意 MCP」语义有明确决定。
+      → 全仓裸 `mcp__*` 零残留；决定为「枚举 server + server-scoped 通配符」，理由见 PROBE 文档。
+- [x] 轻量档有可机器判定的边界，并有测试覆盖其判定逻辑。
+      → **本条此前不成立**：分档只存在于提示词散文，`src/` 下无任何代码，故无从测试。
+      已补 `regression.test.ts` 回归测试锁定判定边界（扩展名集合、「never by how many lines」、
+      灰区 fail-closed、重试与循环上限）。**已变异验证 4/4 均被捕获**，非空过测试。
+- [x] 三个 agent 模板行数明显下降（记录改动前后数值）；`trellis-research.md` 的
       「必须写文件」不再重复 7 次。
-- [ ] `pnpm typecheck` 与 `test` 全绿（基线：54 文件 / 1306 passed / 1 skipped / 0 failed）。
-- [ ] scratch 目录 `trellis init --claude -y` 冒烟通过。
-- [ ] `.claude/agents/probe-mcp-*.md` 已删除。
+      → 375 → 267（-29%）：implement 111→51、research 148→90、check 116→126。
+      research 的「写文件/别贴回对话」由 7 次降至 2 次。
+      check 变长是有意的，换来 docs-only 分档、失败预算与显式降级声明。
+- [x] `pnpm typecheck` 与 `test` 全绿。
+      → 实测 55 文件 / 1309 passed / 1 skipped / 0 failed；`pnpm lint` 亦干净。
+      （原文记的基线 54/1306 已过期，差额为本批次新增测试。）
+- [x] scratch 目录 `trellis init --claude -y` 冒烟通过。
+      → 生成 93 个模板文件，`.trellis/` 与 `.claude/agents/` 产物齐备，无报错。
+- [x] `.claude/agents/probe-mcp-*.md` 已删除。→ glob 零命中。
 
 ## Notes
 

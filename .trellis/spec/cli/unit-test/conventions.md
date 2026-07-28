@@ -54,12 +54,13 @@ delete process.env.OPENCODE_RUN_ID;
 | New platform | Unit (auto-covered by `registry-invariants.test.ts`) | Added opencode → invariants verify consistency |
 | Bug fix | Regression test | Fixed Windows encoding → add to `regression.test.ts` |
 | Changed init/update behavior | Integration test | Changed downgrade logic → add/update scenario in `update.integration.test.ts` |
+| Behavioral rule added to an agent prompt template | Regression test asserting the prompt text | Added the check agent's docs-only tier → assert the extension set, the "never by line count" rule, and the fail-closed default in `regression.test.ts` |
 
 ### Don't need tests
 
 | Change Type | Reason |
 |-------------|--------|
-| Template text / doc content changes | No logic change |
+| Template text that only explains or rephrases | No behavior depends on the exact wording |
 | New migration manifest JSON | `registry-invariants.test.ts` auto-validates format |
 | CLI flag description text | Display-only |
 
@@ -74,12 +75,21 @@ delete process.env.OPENCODE_RUN_ID;
 
 ```
 Does this change have logic branches?
-├─ No (pure data/text) → Don't write tests
+├─ No (pure data/text)
+│  ├─ Is it a rule an agent is expected to FOLLOW? → Regression test on the prompt text
+│  └─ Otherwise → Don't write tests
 └─ Yes
    ├─ Standalone function with predictable input→output? → Unit test
    ├─ Fixing a historical bug? → Regression test (verify fix exists in source)
    └─ Changes init/update end-to-end behavior? → Integration test
 ```
+
+> **Why prompt prose gets tested.** An agent template is shipped behavior, but prose has
+> no compiler and no caller — nothing fails when a rule is silently reworded or dropped.
+> Assert the load-bearing phrases (decision boundaries, enumerated sets, caps, fail-closed
+> defaults), not the prose around them. Then mutate each anchor and confirm the test goes
+> red: an assertion on text nobody can break is worse than no test, because it reads as
+> coverage. Anything that would still pass after the rule is deleted is not pinning it.
 
 ---
 
