@@ -101,11 +101,11 @@ The shape and dispatch wiring are already generic, so adding a skill requires on
 
 4. **No dispatch wiring is required.** `listDirectories("bundled-skills")` discovers the new directory automatically, so all platforms receive it on the next `trellis init` or `trellis update`.
 
-5. **Verify the distribution path** before shipping. Skipping any of these steps has historically caused features to be documented as bundled while the published npm tarball was missing the files:
+5. **Verify the distribution path** before shipping. Skipping any of these steps has historically caused features to be documented as bundled while the built `dist/` the CLI actually runs from was missing the files:
 
    - Source files exist on the branch being tagged.
-   - `pnpm --filter @mindfoldhq/trellis build` copies the asset into `dist/templates/common/bundled-skills/<skill>/`.
-   - `npm pack --dry-run --json` includes the expected `dist/**` paths.
+   - `pnpm --filter trellis-enhance build` copies the asset into `dist/templates/common/bundled-skills/<skill>/`.
+   - The expected `dist/templates/**` paths exist after that build.
    - In a fresh temp project, `trellis init` writes `.claude/skills/<skill>/SKILL.md`, `.agents/skills/<skill>/SKILL.md`, `.zcode/skills/<skill>/SKILL.md`, etc.
    - `.trellis/.template-hashes.json` lists the generated files.
    - `trellis update --dry-run` in that temp project reports "Already up to date!".
