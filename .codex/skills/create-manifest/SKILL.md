@@ -175,7 +175,7 @@ The docs-site root path is stable. Development cycles live under `beta/` or `rc/
 |---|---|---|
 | Start a new beta | `docs-site/scripts/docs-beta-start.sh` | Before the first beta of a new minor/major, for example `0.6.0-beta.0`. |
 | Beta to RC | `docs-site/scripts/docs-beta-to-rc.sh` | Before the first rc, for example `0.6.0-rc.0`. |
-| RC to GA | `docs-site/scripts/docs-promote.sh` | Before `pnpm release:promote`. |
+| RC to GA | `docs-site/scripts/docs-promote.sh` | Before cutting GA. |
 
 Per-patch releases (`-beta.1`, `-rc.1`, `0.5.1`) do not run lifecycle scripts. Write changelog MDX, update `docs.json`, commit/push docs-site, then bump the main repo submodule pointer.
 
@@ -186,16 +186,14 @@ Full reference: `.trellis/spec/docs-site/docs/release-lifecycle.md`.
 Run local verification only; do not publish locally.
 
 ```bash
-node packages/cli/scripts/check-docs-changelog.js --type <beta|rc|promote>
 node packages/cli/scripts/release-preflight.js check-versions
-node packages/cli/scripts/release-preflight.js verify-packed-cli
-node packages/cli/scripts/release-preflight.js publish-plan
 pnpm lint
 pnpm typecheck
 pnpm test
 ```
 
-Skip `check-docs-changelog` only for stable patch releases where that command is not required by the release type.
+`check-versions` is the only preflight gate. The npm-era subcommands were removed — see
+`.trellis/spec/cli/backend/release-process.md` → "No npm publishing".
 
 ## Step 10: Review and Confirm
 
@@ -207,25 +205,23 @@ Verify:
 4. **All** submodule commits are pushed before the main repo pointer commit (currently `docs-site/` + `marketplace/`). Verify with: `git submodule foreach 'sha=$(git rev-parse HEAD); git ls-remote origin $sha | grep -q $sha && echo "ok $name" || echo "FAIL $name $sha"'`. Tag-triggered CI does `git submodule update --init --recursive` and fails on the first unpushed pointer with `fatal: remote error: upload-pack: not our ref <SHA>`.
 5. `@mindfoldhq/trellis` and `@mindfoldhq/trellis-core` versions still match.
 
-## Step 11: Publish Through CI
+## Step 11: Release
 
-Use the project release script so the tag starts CI:
-
-```bash
-pnpm release
-pnpm release:beta
-pnpm release:rc
-pnpm release:promote
-```
-
-After CI succeeds, verify public npm:
+This fork publishes nothing — a release is a version bump plus a `v<version>` tag on `main`. Land the
+work on `dev`, promote it with a `dev` -> `main` PR, then tag from `main`:
 
 ```bash
-npm view @mindfoldhq/trellis@<version> version dist-tags --json --registry=https://registry.npmjs.org/
-npm view @mindfoldhq/trellis-core@<version> version dist-tags --json --registry=https://registry.npmjs.org/
+git switch main && git pull
+pnpm release            # patch; also release:minor / release:major
 ```
 
-If CI fails or npm visibility is wrong, fix the workflow/scripts and re-run the CI path. Do not use local publish to fill the gap.
+`release.js` refuses to run on any other branch. Confirm the tag landed:
+
+```bash
+git ls-remote --tags origin "v<version>"
+```
+
+Full flow: `.trellis/spec/cli/backend/release-process.md`.
 
 ## Dogfooding
 

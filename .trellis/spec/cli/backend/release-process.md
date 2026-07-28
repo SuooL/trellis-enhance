@@ -31,10 +31,12 @@ the tag is the only release artifact, so a mismatch makes the release unidentifi
   `publish.yml`; it was deliberately retired (archived task
   `.trellis/tasks/archive/2026-07/07-08-retire-publish-workflow`) because it would have published
   `trellis-enhance` to a registry the project does not use.
-- `packages/cli/scripts/release-preflight.js` still carries npm-era subcommands (`npm-tag`,
-  `publish-plan`, `verify-packed-cli`, `verify-npm`). They are **not** part of the release path and
-  must not be added back as gates — they assert facts about a registry this project never writes to.
-  Only `check-versions` is a real gate.
+- `packages/cli/scripts/release-preflight.js` exposes exactly one command: `check-versions`. The
+  npm-era subcommands (`npm-tag`, `publish-plan`, `verify-packed-cli`, `verify-npm`) were **removed**
+  on 2026-07-28. They asserted facts about a registry this project never writes to, and `publish-plan`
+  went further — it queried npm for `@mindfoldhq/trellis-core`, which is *upstream's* published
+  package rather than this fork's, and reported "already on npm / needs publish" from the answer. Do
+  not add them back.
 - Users do not upgrade with `npm install -g`. They `git pull` in their clone and rebuild; the husky
   `post-merge` / `post-checkout` hooks rebuild automatically when product source changed.
   `trellis upgrade` prints those instructions rather than invoking a package manager
@@ -48,8 +50,8 @@ the tag is the only release artifact, so a mismatch makes the release unidentifi
 |---|---|
 | Shared version | `packages/cli/package.json` and `packages/core/package.json` must have the same `version`. |
 | Shared tag | Git tag `v<version>` must match both package versions. |
-| Source dependency | CLI depends on core with `workspace:*` — this stays `workspace:*`; nothing rewrites it to a fixed range, because nothing is packed for a registry. |
-| Tag ancestry | Every `v*` tag must be reachable from `main`. Tags that are not on `main`'s ancestor chain are stray upstream leftovers and get pruned (33 such tags were removed in the 2026-07 cleanup). |
+| Source dependency | CLI depends on core with `workspace:*` — this stays `workspace:*`; nothing rewrites it to a fixed range, because nothing is packed for a registry. Enforced by `check-versions` across every dependency field plus the root `pnpm.overrides` / `resolutions`, since upstream publishes a package under the same `@mindfoldhq/trellis-core` name. |
+| Tag ancestry | Every `v*` tag must be reachable from `main`. Tags that are not on `main`'s ancestor chain are stray upstream leftovers and get pruned (33 such tags were removed in the 2026-07 cleanup). Verified 2026-07-28: 103 local tags, all reachable from `main`, 0 stray — and `origin` carries none of them. |
 
 Required gate:
 
@@ -89,24 +91,36 @@ git switch main && git pull
 pnpm release            # patch; also release:minor / release:major
 ```
 
-`packages/cli/scripts/release.js` runs: `check-manifest-continuity` → core tests → CLI tests →
-pre-release commit (excluding `docs-site`, `marketplace`, `.trellis`) → `bump-versions.js <type>` →
-`release-preflight check-versions` → version commit (message = the bare version string) →
-`git tag v<version>` → `git push origin main --tags`.
+`packages/cli/scripts/release.js` runs: **branch guard** → `check-manifest-continuity` → core tests →
+CLI tests → pre-release commit (excluding `docs-site`, `marketplace`, `.trellis`) →
+`bump-versions.js <type>` → `release-preflight check-versions` → version commit (message = the bare
+version string) → `git tag v<version>` → `git push origin main` → `git push origin refs/tags/v<version>`.
 
 It performs **no publication** — the pushed tag *is* the release.
 
-> **Run it on `main`, not on `dev`.** For `patch` / `minor` / `major` / `promote`, `release.js`'s
-> `pushTarget()` returns the literal `main`, so it pushes the local `main` ref regardless of what is
-> checked out. Running it from `dev` produces a tag on a `dev` commit and a push of a stale `main`.
+> **It refuses to run anywhere but `main`.** `releaseBranchError()` compares the checked-out branch
+> against `main` and aborts before anything is bumped, committed, or tagged. This replaced an earlier
+> `pushTarget()` that returned the literal `main` ref regardless of the checkout, so running from
+> `dev` tagged a `dev` commit while pushing a stale local `main`.
+
+> **The tag is pushed on its own ref, never with `--tags`.** `git push --tags` would push all 103
+> local tags inherited from upstream history to an `origin` that carries none of them. The two pushes
+> fail differently and the script says which happened: if the **branch** push fails the whole release
+> is still local and the script deletes the local tag so a retry starts clean; if the **tag** push
+> fails the version commit already landed, so re-push the tag by hand and do *not* re-run
+> `pnpm release`, which would bump the version a second time.
 
 Prerequisite repo configuration: branch protection on both `main` and `dev` with `verify` as the
 required check, and "Allow auto-merge" enabled (auto-merge only ever applies to `dev`).
 
-**Retired tracks.** The `pnpm release:beta` / `release:rc` / `release:promote` scripts and their
-`check-docs-changelog` guard exist only because beta/rc lines were npm dist-tags (`beta`, `rc`,
+**Retired tracks.** `pnpm release:beta` / `release:rc` / `release:promote` and their
+`check-docs-changelog` guard existed only because beta/rc lines were npm dist-tags (`beta`, `rc`,
 `latest`) on the upstream registry. With no registry there is nothing for a prerelease dist-tag to
-mean, so this fork ships one line off `main` and does not use those scripts.
+mean, so they were **removed** on 2026-07-28: `release.js` accepts only `patch` / `minor` / `major`,
+the three scripts are gone from both the root and `packages/cli` `package.json`, and
+`packages/cli/scripts/check-docs-changelog.js` was deleted along with its last caller.
+`bump-versions.js` still understands `beta` / `rc` / `promote` as bump arithmetic, but nothing in the
+release path passes them.
 
 ---
 
