@@ -109,3 +109,37 @@ workflow.md 的 JSONL ready gate 三处丢了 #292 原本的 complex 限定,导�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: 子任务 4：对抗性审查降本与收窄触发
+
+**Date**: 2026-07-28
+**Task**: 子任务 4：对抗性审查降本与收窄触发
+**Branch**: `feature/subtask4-wrapup`
+
+### Summary
+
+Codex 调用由 1-5 次不可预测钉死为恒定 1 次(所有角色进同一 prompt);默认角色数 2-5 → 2-3;输出改为按需落盘(短问题直接答完,不再强制写文件+二次跳转);触发词删掉 'a second independent opinion' 与 '找出方案的缺陷',并显式声明日常措辞不触发、审代码 diff 归 trellis-check。更正此前审计的「最多 11 次调用」——Panel A 是同会话推理而非 N 次模型调用。过程中撞到自己造的 bug:create-pr 省略 --body 导致 gh 非交互模式失败,原有 7 例测试只验 --dry-run 文本从未真正调用 gh,已修并补真实失败路径断言。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4c85cff8` | (see git log) |
+| `5941cc96` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
