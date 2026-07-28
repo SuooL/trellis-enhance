@@ -1,0 +1,10 @@
+# trellis-enhance: auto-rebuild the CLI after merge/pull IF product source changed,
+# so the symlinked global `trellis` reflects the latest without a reinstall.
+if git diff-tree -r --name-only ORIG_HEAD HEAD 2>/dev/null | grep -qE '^packages/(cli|core)/(src|scripts)/'; then
+  printf '[trellis-enhance] product source changed — rebuilding CLI...\n'
+  if pnpm --filter trellis-enhance build >/dev/null 2>&1; then
+    printf "[trellis-enhance] ✓ build done — global 'trellis' is current.\n"
+  else
+    printf "[trellis-enhance] ✗ build FAILED — run: pnpm --filter trellis-enhance build\n"
+  fi
+fi
