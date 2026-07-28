@@ -74,3 +74,38 @@ workflow.md 的 JSONL ready gate 三处丢了 #292 原本的 complex 限定,导�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: 子任务 2：Git/CI 修缺陷 + 让 diff-coverage 真正自用
+
+**Date**: 2026-07-27
+**Task**: 子任务 2：Git/CI 修缺陷 + 让 diff-coverage 真正自用
+**Branch**: `feature/subtask2-wrapup`
+
+### Summary
+
+两份分歧的 CI 合并为一份:lint 此前只在 main 路径运行、feature→dev 从不执行(启用后第一个 PR 就抓到真错误);diff-coverage 硬门禁此前只存在于发给用户的模板里,现本仓启用,core 与 cli 均出 cobertura 报告(core 占三分之一源码,只测 cli 会留静默盲区)。门禁已实地验证会咬人:临时加入未测试函数后精确报出 0% 覆盖并判失败。修 base_branch 串台(钩子从 dev 切出即无条件记 dev,补 3 例测试并变异验证)。修 --delete-branch(auto-merge 自带的 delete_branch 默认 false 会覆盖仓库设置),模板同步该修复,两次 PR 验证分支确被自动删除。按用户要求收敛手工步骤 10 项→5 项,砍掉本地无法验证的 diff coverage 核对等纯仪式项。刻意不加 paths-ignore(必需检查被跳过会永久阻塞 auto-merge)。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7e49dc63` | (see git log) |
+| `42e6471b` | (see git log) |
+| `3f053e33` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
