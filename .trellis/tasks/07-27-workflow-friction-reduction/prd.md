@@ -235,16 +235,31 @@ workflow 与 agent 定义互相矛盾，agent 可能只跑一套也可能两套�
 
 ---
 
-## 当前状态：blocked（2026-07-28）
+## 当前状态：阻塞已解除，四条流程全部完成（2026-07-28）
 
 四条流程的可做部分全部完成并合入 `dev`（PR #3–#18）。集成回顾（验收标准第 5 条）已做，
 抓出并修复两处「收窄了一处、漏了另一处」的不一致。
 
-**唯一阻塞项**：子任务 3 的验收标准第 2 条 —— 跨模型审查**可被验证真实发生** ——
-无法在当前环境勾选。MCP 调用返回 401，根因是 CC switch 向 Claude Code 进程注入第三方
-`OPENAI_API_KEY`，而 `~/.codex/config.toml` 没有对应的 `[model_providers]` base URL 配置，
-于是第三方 key 被发往 `api.openai.com`。**属用户环境问题，Trellis 侧无可修之处。**
+**原阻塞项**（子任务 3 验收标准第 2 条：跨模型审查可被验证真实发生）**已解除**。
+此前判断是 MCP 返回 401，根因为 CC switch 向进程注入第三方 `OPENAI_API_KEY` 而
+`~/.codex/config.toml` 无对应 `[model_providers]`，属用户环境问题。
 
-解除条件：配好 codex 的 provider 后，拿一个含已知 bug 的 diff 实跑一次 `trellis-check`，
-确认报告首行声明的实际审查者是 Codex 而非 native fallback。届时勾选该条，
-归档子任务 3，父任务随之可归档。
+**实测推翻了「需要配置才能解除」这一前提**：当前会话进程里根本没有 `OPENAI_API_KEY`，
+ChatGPT 登录凭据在位，裸调 `mcp__codex__codex` 直接通过，`model=gpt-5.5` + `xhigh` +
+`read-only`（trellis-check 的完全相同调用形状）同样通过。**401 是环境态而非常态**，
+随注入方消失而消失。Trellis 侧一行代码都不需要改 —— 这与原结论「Trellis 侧无可修之处」
+一致，只是解除方式不是「去配置」而是「注入源不在了」。
+
+解除证据：植入 `isNewerVersion` 的 `>=` vs `>` 边界 bug 后实跑 `trellis-check`，
+报告首行 `Reviewer: Codex GPT-5.5 (xhigh)`，首次调用即成功并精确命中该 bug。夹具已还原。
+
+**过程中撤回的一个错误方向（记下来防止重走）**：为「让它在有注入时也能跑」，一度设计了
+项目内 Codex endpoint 配置（`.trellis/config.yaml` 的 `codex.review_config` +
+模板文档 + 一度考虑改 agent 改走 Bash `codex exec`）。**定位错误**：Codex 走哪个中转端点、
+密钥放哪，是开发者机器的环境配置，不是每个 `trellis init` 产物都需要的产品能力；
+做进模板等于把一个人的代理端点问题固化进发给所有人的 CLI，与本任务「减摩擦」的初衷相反。
+改动存于 `git stash`，**不建议 pop**（其中「`api_key = "sk-..."`」已被实测证伪）。
+
+同批补上的真实缺口：子任务 3 验收标准第 5 条（轻量档需有测试覆盖）**此前不成立**——
+docs-only 分档只存在于提示词散文，`src/` 下无代码故无从测试。已补回归测试锁定其判定边界，
+并变异验证 4/4 均被捕获。

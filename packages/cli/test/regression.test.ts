@@ -6129,6 +6129,37 @@ describe("regression: sub-agent context injection fallback (0.5.3)", () => {
     });
   }
 
+  // The check agent's review tiering and its anti-silent-fallback disclosure
+  // live in prompt prose, not in code, so nothing else stops a later edit from
+  // quietly dropping them. Claude is the only platform carrying the cross-model
+  // review flow; the other trellis-check variants are deliberately out of scope.
+  it("claude/check agent pins the docs-only tier boundary and the reviewer disclosure", () => {
+    const content = fs.readFileSync(
+      path.join(repoRootFb, "packages/cli/src/templates/claude/agents/trellis-check.md"),
+      "utf-8",
+    );
+
+    // The tier is chosen by file type, so the concrete extension set has to stay
+    // spelled out — "documentation" alone is not a decidable boundary.
+    expect(content).toContain("Docs-only tier");
+    for (const ext of ["*.md", "*.txt", "*.rst"]) {
+      expect(content).toContain(ext);
+    }
+    // ...and never by diff size: a one-line source change can still be a bug.
+    expect(content).toMatch(/never by how many lines/i);
+    // Ambiguous paths must fail closed to the full tier.
+    expect(content).toMatch(/unsure[\s\S]{0,120}treat it as source/i);
+
+    // Bounded Codex retry and bounded verify loop.
+    expect(content).toMatch(/Failure budget[\s\S]{0,40}one retry/i);
+    expect(content).toMatch(/at most 3 cycles/i);
+
+    // A silent fallback is the exact failure this agent exists to prevent, so
+    // the report has to lead with which reviewer actually ran.
+    expect(content).toContain("**Reviewer**");
+    expect(content).toMatch(/native self-review/i);
+  });
+
   for (const agent of ["implement", "check"] as const) {
     it(`kiro/${agent} JSON agent carries marker + fallback protocol in prompt`, () => {
       // 0.5.7 (#247): Kiro CLI renamed `instructions` → `prompt` in agent JSON.
