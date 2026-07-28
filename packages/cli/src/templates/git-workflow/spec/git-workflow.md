@@ -36,8 +36,8 @@ feature/<slug>  →  PR  →  dev  →  CI (build + test + diff-cov ≥ 80%) gre
 - The `after_create` lifecycle hook (`git_branch.py create`) creates this branch
   automatically **only** when the working directory is a git repo and the task
   has no `branch` set yet. Non-git repos / already-set branches are safe-skipped.
-- **PR target is always `dev`.** Set it explicitly with
-  `task.py set-base-branch <task> dev` (or rely on the project default).
+- **PR target is always `dev`.** The `after_create` hook records this; you only
+  need `task.py set-base-branch <task> <branch>` when targeting something else.
 - **Never push directly to `dev` or `main`.** All changes reach `dev` through a
   PR; `main` only receives changes through the release workflow.
 - `hotfix` work uses the same `feature/*` convention — there is no separate
@@ -71,10 +71,12 @@ Before writing code for a task, confirm:
    `main`. If the `after_create` hook was skipped (non-git repo at create time,
    or branch set later), create it manually:
    `git switch -c feature/<task-slug>` then `task.py set-branch <task> feature/<task-slug>`.
-2. **PR target is `dev`** — `task.py set-base-branch <task> dev`.
-3. **Base is current** — the feature branch is based on an up-to-date `dev`.
-4. **Test plan exists** — you know which tests will cover the new behavior
+2. **Test plan exists** — you know which tests will cover the new behavior
    (the diff-coverage gate will reject under-tested diffs).
+
+> PR target and base freshness used to be items 2 and 3 here. The `after_create`
+> hook already records `dev` as the base and forks from an up-to-date `dev`, so
+> asking you to re-verify them by hand was pure ceremony.
 
 ---
 
@@ -86,10 +88,14 @@ Before opening / finalizing the PR to `dev`, verify:
 |-------|-------------|
 | Build | Passes locally. |
 | Tests | Full suite green; new behavior is covered. |
-| Diff coverage | Added/changed lines ≥ 80% covered (CI hard gate). |
-| Branch | Work is on `feature/<task-slug>`; PR base is `dev`. |
-| No direct pushes | Nothing was pushed straight to `dev` / `main`. |
 | Scope | Only files required by this task changed. |
+
+CI owns the rest. Diff coverage, the PR base, and "nothing was pushed straight
+to `dev`" were all on this list, but they are decided on the server: the
+coverage gate runs against the PR diff, `create-pr` reads the base from
+`task.json`, and branch protection is what actually prevents a direct push.
+Re-checking them by hand cost time and caught nothing — and diff coverage in
+particular was unverifiable locally, since the tooling only exists in CI.
 
 When all pass, open the PR with `task.py create-pr` (`--dry-run` previews it).
 That command pushes the branch and opens the PR in one step — it is the only

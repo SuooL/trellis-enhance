@@ -95,7 +95,12 @@ jobs:
       # finishing and this step running could be the one that actually
       # merges once checks re-run and pass on it — never on an unverified sha.
       - name: Enable PR auto-merge
-        run: gh pr merge --auto --squash --match-head-commit "$HEAD_SHA" "$PR_URL"
+        # --delete-branch is required. The auto-merge request carries its own
+        # delete_branch flag (default false) which OVERRIDES the repository's
+        # "Automatically delete head branches" setting — without this flag,
+        # merged feature branches pile up on the remote even though that
+        # setting is enabled.
+        run: gh pr merge --auto --squash --delete-branch --match-head-commit "$HEAD_SHA" "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
