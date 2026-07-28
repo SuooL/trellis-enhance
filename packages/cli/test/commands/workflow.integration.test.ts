@@ -9,6 +9,12 @@
  * - `trellis update` after switch to tdd does NOT silently restore native.
  * - Non-interactive modified workflow.md fails without --force / --create-new.
  * - `--create-new` writes `.new` and leaves workflow.md + hash untouched.
+ * - `.trellis/.workflow-template` marker: written on non-native switch/init,
+ *   cleared on switch back to native, and never rewritten by update.
+ * - `trellis update` stops re-listing a non-native workflow.md as "Modified by
+ *   you" on every run, while a native project still receives workflow.md updates.
+ * - Codex `dispatch_mode` warning fires only for a non-native switch on a
+ *   Codex-configured project with the knob still unset.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -298,5 +304,162 @@ describe("trellis workflow integration", () => {
     expect(afterUpdate).not.toBe(
       replacePythonCommandLiterals(workflowMdTemplate),
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Active-workflow marker (.trellis/.workflow-template)
+  //
+  // Regression cover for the "trellis update re-prompts for workflow.md on
+  // every run" bug: the hash entry is intentionally absent for a non-native
+  // workflow, which analyzeChanges() read as "user modified it" — so update
+  // asked overwrite/skip/create-new forever. The marker lets update drop the
+  // file from the template set instead.
+  // ---------------------------------------------------------------------------
+
+  const markerPath = () => path.join(tmpDir, PATHS.WORKFLOW_TEMPLATE_FILE);
+
+  it("switching to a non-native workflow records the active template id", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true });
+    // Default native init leaves no marker — absence means native.
+    expect(fs.existsSync(markerPath())).toBe(false);
+
+    await runWorkflowCommand({ template: "tdd" });
+    expect(fs.readFileSync(markerPath(), "utf-8").trim()).toBe("tdd");
+  });
+
+  it("switching back to native clears the marker", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true, workflow: "tdd" } as Record<string, unknown>);
+    expect(fs.readFileSync(markerPath(), "utf-8").trim()).toBe("tdd");
+
+    await runWorkflowCommand({ template: "native", force: true });
+    expect(fs.existsSync(markerPath())).toBe(false);
+  });
+
+  it("init --workflow tdd records the marker", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true, workflow: "tdd" } as Record<string, unknown>);
+    expect(fs.readFileSync(markerPath(), "utf-8").trim()).toBe("tdd");
+  });
+
+  it("trellis update stops listing a non-native workflow.md as needing a decision", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true });
+    await runWorkflowCommand({ template: "tdd" });
+
+    // console.log is already spied in beforeEach, so re-spying hands back the
+    // same recorder — drop the switch-command output before measuring update's.
+    const logSpy = vi.spyOn(console, "log").mockImplementation(noop);
+    logSpy.mockClear();
+    await update({ skipAll: true });
+    const printed = logSpy.mock.calls
+      .map((call) => call.map(String).join(" "))
+      .join("\n");
+
+    // The whole symptom was workflow.md showing up under "Modified by you
+    // (need your decision)" on every single run.
+    expect(printed).not.toContain(PATHS.WORKFLOW_GUIDE_FILE);
+  });
+
+  it("repeated updates keep a non-native workflow.md byte-identical", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true });
+    await runWorkflowCommand({ template: "tdd" });
+
+    const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
+    const expected = replacePythonCommandLiterals(TDD_CONTENT);
+
+    await update({ skipAll: true });
+    await update({ skipAll: true });
+
+    expect(fs.readFileSync(wfPath, "utf-8")).toBe(expected);
+    // The marker itself is protected user state — update must never rewrite it.
+    expect(fs.readFileSync(markerPath(), "utf-8").trim()).toBe("tdd");
+  });
+
+  it("a native project still receives workflow.md updates (marker absent)", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true });
+
+    const wfPath = path.join(tmpDir, PATHS.WORKFLOW_GUIDE_FILE);
+    // Simulate an older installed workflow.md that is still hash-pristine, so
+    // update() is allowed to refresh it to current native bytes.
+    const native = replacePythonCommandLiterals(workflowMdTemplate);
+    fs.writeFileSync(wfPath, "# stale native workflow\n", "utf-8");
+    const { updateHashes } = await import("../../src/utils/template-hash.js");
+    updateHashes(
+      tmpDir,
+      new Map([[PATHS.WORKFLOW_GUIDE_FILE, "# stale native workflow\n"]]),
+    );
+
+    await update({ skipAll: true });
+
+    expect(fs.readFileSync(wfPath, "utf-8")).toBe(native);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Codex dispatch_mode linkage
+  // ---------------------------------------------------------------------------
+
+  it("warns that Codex dispatch_mode defaults to inline after a non-native switch", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true, codex: true } as Record<string, unknown>);
+
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    await runWorkflowCommand({ template: "tdd" });
+    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+
+    expect(written).toContain("dispatch_mode");
+    expect(written).toContain("tdd");
+  });
+
+  it("stays quiet about dispatch_mode when switching to native", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true, codex: true } as Record<string, unknown>);
+    await runWorkflowCommand({ template: "tdd" });
+
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    await runWorkflowCommand({ template: "native", force: true });
+    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+
+    expect(written).not.toContain("dispatch_mode");
+  });
+
+  it("stays quiet about dispatch_mode when the user already set it explicitly", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true, codex: true } as Record<string, unknown>);
+
+    const configPath = path.join(tmpDir, ".trellis", "config.yaml");
+    fs.appendFileSync(
+      configPath,
+      "\ncodex:\n  dispatch_mode: sub-agent\n",
+      "utf-8",
+    );
+
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    await runWorkflowCommand({ template: "tdd" });
+    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+
+    expect(written).not.toContain("dispatch_mode");
+  });
+
+  it("stays quiet about dispatch_mode when Codex is not a configured platform", async () => {
+    stubMarketplaceFetch();
+    await init({ yes: true, claude: true } as Record<string, unknown>);
+
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+    await runWorkflowCommand({ template: "tdd" });
+    const written = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+
+    expect(written).not.toContain("dispatch_mode");
   });
 });

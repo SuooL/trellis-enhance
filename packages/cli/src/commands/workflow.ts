@@ -25,6 +25,7 @@ import inquirer from "inquirer";
 
 import { DIR_NAMES, PATHS } from "../constants/paths.js";
 import { collectMissingAgents } from "../utils/agent-refs.js";
+import { getConfiguredPlatforms } from "../configurators/index.js";
 import { replacePythonCommandLiterals } from "../configurators/shared.js";
 import {
   computeHash,
@@ -35,6 +36,7 @@ import {
 import {
   listWorkflowTemplates,
   resolveWorkflowTemplate,
+  writeActiveWorkflowId,
   NATIVE_WORKFLOW_ID,
   WorkflowResolveError,
   type ResolvedWorkflowTemplate,
@@ -155,6 +157,10 @@ function applyHashContract(cwd: string, templateId: string): void {
     // native bytes.
     removeHash(cwd, relPath);
   }
+  // Record which template is active so `trellis update` can leave a non-native
+  // workflow.md out of the template set entirely instead of re-prompting for it
+  // on every run.
+  writeActiveWorkflowId(cwd, templateId);
 }
 
 async function writeWorkflow(
@@ -301,6 +307,45 @@ export async function runWorkflowCommand(
   // at `trellis update` so `trellis channel spawn --agent <name>` doesn't fail
   // mid-session. Non-blocking; never errors a successful write.
   warnAboutMissingAgents(cwd, template.content);
+  warnAboutCodexDispatchMode(cwd, template.id);
+}
+
+/**
+ * Best-effort warning: a non-native workflow generally expects sub-agent
+ * dispatch, but Codex's `codex.dispatch_mode` defaults to `inline`, whose
+ * per-turn banner literally tells Codex "do not dispatch implement/check
+ * sub-agents". The bundled native workflow reconciles this with parallel
+ * `<status>-inline` breadcrumb variants; a marketplace workflow has no such
+ * variants, so the default silently contradicts the workflow just selected.
+ *
+ * Only fires when Codex is configured and the knob is still at its default —
+ * an explicit `dispatch_mode:` means the user already made the call.
+ */
+function warnAboutCodexDispatchMode(cwd: string, templateId: string): void {
+  if (templateId === NATIVE_WORKFLOW_ID) return;
+  if (!getConfiguredPlatforms(cwd).has("codex")) return;
+
+  const configPath = path.join(cwd, DIR_NAMES.WORKFLOW, "config.yaml");
+  let configText = "";
+  try {
+    configText = fs.readFileSync(configPath, "utf-8");
+  } catch {
+    return; // No config.yaml — nothing reliable to say.
+  }
+  // Uncommented `dispatch_mode:` anywhere means the user set it explicitly.
+  if (/^\s*dispatch_mode\s*:/m.test(configText)) return;
+
+  process.stderr.write(
+    chalk.yellow(
+      `\n⚠ Codex is configured and \`codex.dispatch_mode\` is unset, so it defaults to "inline" —\n`,
+    ) +
+      chalk.yellow(
+        `  which tells Codex NOT to dispatch implement/check sub-agents. The "${templateId}" workflow\n`,
+      ) +
+      chalk.yellow(
+        `  likely expects dispatch. Set \`codex.dispatch_mode: sub-agent\` in ${DIR_NAMES.WORKFLOW}/config.yaml to match.\n`,
+      ),
+  );
 }
 
 function warnAboutMissingAgents(cwd: string, workflowContent: string): void {

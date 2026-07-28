@@ -31,6 +31,7 @@ import {
   computeHash,
 } from "../utils/template-hash.js";
 import { compareVersions } from "../utils/compare-versions.js";
+import { hasNonNativeWorkflow } from "../utils/workflow-resolver.js";
 import { toPosix } from "../utils/posix.js";
 import { setupProxy } from "../utils/proxy.js";
 import { emptyTaskJson } from "../utils/task-json.js";
@@ -118,6 +119,7 @@ const PROTECTED_PATHS = [
   `${DIR_NAMES.WORKFLOW}/${DIR_NAMES.SPEC}`, // spec/
   `${DIR_NAMES.WORKFLOW}/.developer`,
   `${DIR_NAMES.WORKFLOW}/.current-task`,
+  PATHS.WORKFLOW_TEMPLATE_FILE, // .workflow-template — records the active workflow id
 ];
 
 function getManagedBlock(
@@ -883,7 +885,15 @@ async function collectTemplateFiles(
   // --force behavior applies. Partial tag-block merging is unsafe because
   // platform routing markers outside [workflow-state:*] blocks are also
   // script-consumed.
-  files.set(`${DIR_NAMES.WORKFLOW}/workflow.md`, workflowMdTemplate);
+  //
+  // Exception: when `.trellis/.workflow-template` says a non-native workflow is
+  // active, workflow.md is user-selected content that native bytes must never
+  // be compared against. Seeding it anyway made every `trellis update` classify
+  // the file as "Modified by you" (its hash entry is intentionally absent) and
+  // re-ask overwrite/skip/create-new on every single run.
+  if (!hasNonNativeWorkflow(cwd)) {
+    files.set(`${DIR_NAMES.WORKFLOW}/workflow.md`, workflowMdTemplate);
+  }
   // workspace/index.md stays excluded — it's runtime-appended by add_session.py
   // (journal index) and has no script-parsed structure.
   files.set(FILE_NAMES.AGENTS, buildAgentsMdTemplate(cwd));
@@ -1093,7 +1103,12 @@ function printChangeSummary(changes: ChangeAnalysis): void {
   if (existingProtectedPaths.length > 0) {
     console.log(chalk.gray("  User data (preserved):"));
     for (const protectedPath of existingProtectedPaths) {
-      console.log(chalk.gray(`    ○ ${protectedPath}/`));
+      // Not every protected path is a directory (`.workflow-template` is a
+      // single-value marker file), so only dirs get the trailing slash.
+      const isDir = fs
+        .statSync(path.join(process.cwd(), protectedPath))
+        .isDirectory();
+      console.log(chalk.gray(`    ○ ${protectedPath}${isDir ? "/" : ""}`));
     }
     console.log("");
   }
