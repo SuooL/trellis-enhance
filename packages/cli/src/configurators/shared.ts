@@ -248,15 +248,15 @@ const SKILL_DESCRIPTIONS: Record<string, string> = {
   brainstorm:
     "Guides collaborative requirements discovery before implementation. Creates task directory, seeds PRD, asks high-value questions one at a time, researches technical choices, and converges on MVP scope. Use when requirements are unclear, there are multiple valid approaches, or the user describes a new feature or complex task.",
   check:
-    "Comprehensive quality verification: spec compliance, lint, type-check, tests, cross-layer data flow, code reuse, and consistency checks. Use when code is written and needs quality verification, before committing changes, or to catch context drift during long sessions.",
+    "Comprehensive quality verification: spec compliance, lint, type-check, tests, cross-layer data flow, code reuse, and consistency checks. Use when code is written and needs quality verification, before committing changes, or to catch context drift during long sessions. On platforms that ship a `trellis-check` sub-agent, dispatch that agent instead — it runs a cross-model review; this skill is the inline-platform form of the same check, and running both duplicates the work.",
   "break-loop":
     "Deep bug analysis to break the fix-forget-repeat cycle. Analyzes root cause category, why fixes failed, prevention mechanisms, and captures knowledge into specs. Use after fixing a bug to prevent the same class of bugs.",
   "update-spec":
     "Captures executable contracts and coding conventions into .trellis/spec/ documents. Use when learning something valuable from debugging, implementing, or discussion that should be preserved for future sessions.",
   "adversarial-review":
-    "Multi-role, dual-model adversarial + constructive review of any project content, plan, design, or question. Independent expert panels run on Opus 4.8 AND Codex GPT-5.5, then divergences are contrasted. Use when the user asks for 对抗性审查 / 批判性审查 / adversarial review / red-team / critical review / 让专家评审 / 找出方案(或代码/设计)的缺陷 / a second independent opinion, or explicitly invokes the question command.",
+    'Multi-role, dual-model adversarial + constructive review of a plan, design, doc, or open question. Two independent expert panels (native + Codex GPT-5.5) run separately and their divergences are contrasted. Use ONLY when the user explicitly asks for an adversarial or red-team review — 对抗性审查 / 批判性审查 / adversarial review / red-team / 让专家评审 — or invokes the question command. Do NOT trigger on casual phrasing like "what do you think", "take another look", or a plain request to find bugs in code: reviewing a code diff is `trellis-check`\'s job, and this skill costs an extra model call.',
   question:
-    "Explicit entry point for a multi-role, dual-model adversarial + constructive review of a plan, design, code, doc, or open question. Loads the trellis-adversarial-review skill and runs two independent expert panels (Opus 4.8 + Codex GPT-5.5), contrasts the divergences, and persists a report. Use when the user wants a critical second opinion or invokes the question command.",
+    "Explicit entry point for a multi-role, dual-model adversarial + constructive review of a plan, design, doc, or open question. Loads the trellis-adversarial-review skill and runs two independent expert panels (native + Codex GPT-5.5), then contrasts the divergences. Use when the user invokes this command. For reviewing a code diff, `trellis-check` is the right tool.",
 };
 
 /**
@@ -681,19 +681,33 @@ function mapLegacyToolToCopilot(tool: string): string[] {
       return ["search"];
     case "Bash":
       return ["execute"];
-    // Generic MCP wildcard — used by trellis-research to opt into "any MCP
-    // tool the user has configured" without locking the source template to a
-    // specific provider. Claude Code parses wildcards as glob-match-at-runtime
-    // (no silent agent-registration skip if nothing matches), so this is the
-    // safe default; explicit `mcp__exa__*` names would silent-skip the agent
-    // when the Exa MCP server is absent (#302).
+    // MCP entries map to Copilot's own external-tool names. The source
+    // templates name servers explicitly rather than using a bare `mcp__*`
+    // wildcard: measured 2026-07-27, `mcp__*` matches nothing at all, so an
+    // agent carrying it silently receives ZERO MCP tools. Naming a server
+    // that the user does not have is harmless — the entry is dropped and the
+    // agent still registers (this supersedes the #302 note that claimed
+    // explicit names cause a silent agent-registration skip; that behavior
+    // was not reproducible).
+    //
+    // `mcp__*` is kept below so projects that still carry the old frontmatter
+    // keep transforming correctly during `trellis update`.
     case "mcp__*":
       return ["web", "exa/*", "chrome-devtools/*"];
+    // Documentation / external lookup servers → Copilot's search tools.
+    case "mcp__plugin_context7_context7__*":
     case "mcp__exa__web_search_exa":
     case "mcp__exa__get_code_context_exa":
       return ["web", "exa/*"];
     case "mcp__chrome-devtools__*":
+    case "mcp__plugin_chrome-devtools-mcp_chrome-devtools__*":
       return ["chrome-devtools/*"];
+    // No Copilot equivalent: cross-model review (codex) and reference
+    // management (zotero) have no counterpart in Copilot's tool vocabulary.
+    case "mcp__codex__codex":
+    case "mcp__codex__codex-reply":
+    case "mcp__zotero-mcp__*":
+      return [];
     case "Skill":
       return [];
     default:

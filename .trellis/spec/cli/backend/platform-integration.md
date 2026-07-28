@@ -69,6 +69,82 @@ When adding a new platform `{platform}`, update the following:
 >
 > Trae follows this shared-hook template pattern but writes `.trae/hooks.json`, `.trae/commands/trellis-*.md` with command frontmatter, `.trae/skills/`, `.trae/agents/`, and `.trae/hooks/`. Its main session uses `SessionStart` / `UserPromptSubmit` hooks; sub-agent context remains class-2 pull-based because Trae does not expose a Trellis-supported sub-agent prompt mutation surface.
 
+### Contract: shared hooks inject context, agent definitions own workflow
+
+A `shared-hooks/*.py` prompt builder may inject **context** (spec files, task
+artifacts, the original prompt). It must **not** prescribe the agent's
+**workflow** — no numbered steps, no "run lint then typecheck", no
+"check item by item".
+
+Why: one shared hook feeds several platforms whose agent definitions
+legitimately differ. `inject-subagent-context.py` is copied into 5 platforms
+(claude / cursor / codebuddy / droid / kiro, per `SHARED_HOOKS_BY_PLATFORM` in
+`src/templates/shared-hooks/index.ts`). Claude's `trellis-check` delegates the
+review to a cross-model reviewer; the other four self-review natively. A
+workflow hardcoded in the shared hook therefore lands in the same prompt as a
+contradictory one from the agent definition, and the agent may run both.
+
+This actually shipped: `build_check_prompt()` injected "Check item by item
+against specs" plus "Pay special attention to impact radius analysis (L1-L5)"
+— the latter undefined anywhere in the repo since the initial commit — while
+`claude/agents/trellis-check.md` instructed delegation to Codex. Fixed
+2026-07-27 by stripping the `## Workflow` / `## Important Constraints` sections
+from the check builder.
+
+Before adding instructions to a shared prompt builder, ask: *would this be
+wrong for any platform that receives it?* If yes, it belongs in that platform's
+agent definition instead.
+
+Keep the `<!-- trellis-hook-injected -->` marker — agent definitions branch on
+its presence to decide whether to self-load context (see
+`claude/agents/trellis-check.md`, "Trellis Context Loading Protocol").
+
+`opencode/plugins/inject-subagent-context.js` is an independent JS
+reimplementation of the same hook. Changes to the Python builders must be
+mirrored there or the twins drift.
+
+### Contract: agent `tools:` must name MCP servers explicitly
+
+**Never write a bare `mcp__*` wildcard in an agent's `tools:` frontmatter — it
+matches nothing.** Use `mcp__<server>__*` or an exact tool name.
+
+Measured 2026-07-27 with four probe agents differing only in that one line, all
+dispatched in the same session against the same MCP configuration:
+
+| `tools:` | MCP tools the sub-agent received |
+|---|---|
+| `Read, Bash` (control) | 0 |
+| `Read, Bash, mcp__*` | **0** |
+| `Read, Bash, mcp__codex__*` | 2 |
+| `Read, Bash, mcp__codex__codex` | 1 |
+
+This is why `trellis-check`'s cross-model review silently never happened: the
+tool was not merely unauthorized, it was absent, so the agent fell through to
+its native-review fallback on every single run. Any agent whose value depends
+on an MCP tool must therefore also **state in its report which reviewer actually
+ran** — a silent fallback is indistinguishable from success.
+
+**Naming a server the user does not have is safe.** A probe listing
+`mcp__nosuchserver__*` registered normally and simply received no tool from it;
+a probe mixing a real and a fake server received the real one. An older comment
+in `configurators/shared.ts` claimed explicit names cause a silent
+*agent-registration* skip when the server is absent (referencing #302) — that
+was not reproducible and the comment has been corrected. Do not reintroduce
+`mcp__*` on that rationale.
+
+Sub-agents also do **not** get a `ToolSearch` tool, so with tool-search
+deferral enabled (`ENABLE_TOOL_SEARCH`, default on) they cannot lazily load an
+MCP schema the way the main session can. Whatever their `tools:` line
+materializes is all they will ever have.
+
+> **Testing agent-definition changes**: the agent registry refreshes with a long,
+> sporadic delay (~10 minutes observed) — not at session start, and not
+> immediately. A newly added agent reporting "not found" therefore proves
+> nothing on its own. **Always create a control agent in the same batch**; only
+> when the control registers and the subject does not have you measured a real
+> behavioral difference. Skipping this control produced one wrong conclusion
+> during this investigation.
+
 **Claude Code pattern** (full hooks + agents + settings):
 
 | Directory                            | Contents                                                     |

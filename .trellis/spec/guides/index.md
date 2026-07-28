@@ -27,6 +27,40 @@ These guides help you **ask the right questions before coding**.
 
 ---
 
+## A Guard You Never Watched Fail Is Not A Guard
+
+Whenever you add or rely on something whose job is to *stop* bad input — a CI
+gate, a lint rule, a validation branch, a cross-model reviewer, a fallback path
+— make it fail once, on purpose, and watch it fail. Then restore.
+
+This repo has shipped several guards that never fired, and each looked healthy
+from the outside:
+
+- `trellis-check` delegated reviews to a second model. The tool it called was
+  never actually granted to the sub-agent, so every run silently fell back to
+  self-review — while still reporting success.
+- The `diff-coverage ≥ 80%` gate was documented in five places and shipped to
+  users, but the repo's own CI never ran it. A 150-line, zero-test PR merged
+  green.
+- `pnpm lint` existed and passed, but only ran on a branch path no task used.
+  The first PR that actually ran it found a real error.
+- `gh pr merge --auto` looked like it deleted merged branches. It did not, and
+  the branches piled up unnoticed for weeks.
+
+The common shape: **success and "never ran" are indistinguishable from the
+outside.** A green check tells you nothing until you have seen a red one.
+
+Two habits that catch this cheaply:
+
+- **Mutate to verify.** Break the thing the guard protects, confirm the guard
+  goes red, restore. A test that never failed proves nothing about the code —
+  only about itself.
+- **Make silent degradation loud.** If a component can fall back to a weaker
+  mode, it must say which mode ran. Anything that degrades quietly will
+  eventually degrade permanently.
+
+---
+
 ## Quick Reference: Thinking Triggers
 
 ### When to Think About Cross-Layer Issues

@@ -11,6 +11,7 @@ Provides:
     cmd_set_scope      - Set scope for PR title
     cmd_add_subtask    - Link child task to parent
     cmd_remove_subtask - Unlink child task from parent
+    cmd_create_pr      - Push the task branch and open its PR
 """
 
 from __future__ import annotations
@@ -18,6 +19,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +41,7 @@ from .paths import (
     DIR_WORKFLOW,
     FILE_TASK_JSON,
     generate_task_date_prefix,
+    get_current_task,
     get_developer,
     get_repo_root,
     get_tasks_dir,
@@ -840,4 +844,176 @@ def cmd_set_status(args: argparse.Namespace) -> int:
             f"and a route in continue.md, or the breadcrumb won't fire.",
             Colors.YELLOW,
         ))
+    return 0
+
+
+# =============================================================================
+# Command: create-pr
+# =============================================================================
+
+def _extract_prd_goal(task_dir: Path) -> str:
+    """Pull the `## Goal` section out of prd.md for the PR body.
+
+    Returns an empty string when prd.md is missing or has no Goal section —
+    the PR is still worth opening without a body.
+    """
+    prd = task_dir / "prd.md"
+    if not prd.is_file():
+        return ""
+
+    try:
+        lines = prd.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+
+    body: list[str] = []
+    in_goal = False
+    for line in lines:
+        if line.startswith("## "):
+            if in_goal:
+                break
+            in_goal = line[3:].strip().lower() == "goal"
+            continue
+        if in_goal:
+            body.append(line)
+
+    goal = "\n".join(body).strip()
+    # An unfilled PRD skeleton makes for a useless PR body.
+    return "" if goal == "TBD." else goal
+
+
+def _print_manual_pr_commands(push_cmd: list[str], gh_cmd: list[str]) -> None:
+    """Print copy-pasteable commands so a missing `gh` never dead-ends the flow."""
+    print()
+    print("Run these manually instead:")
+    print(f"  {subprocess.list2cmdline(push_cmd)}")
+    print(f"  {subprocess.list2cmdline(gh_cmd)}")
+    print()
+    print("Or open the PR from your git host's web UI, targeting the base branch above.")
+
+
+def cmd_create_pr(args: argparse.Namespace) -> int:
+    """Push the task's feature branch and open its PR.
+
+    This command owns the `git push` step: the workflow forbids pushing during
+    the commit step, so without this the push had no owner.
+    """
+    repo_root = get_repo_root()
+
+    target = getattr(args, "name", None)
+    if target:
+        target_dir = resolve_task_dir(target, repo_root)
+    else:
+        current = get_current_task(repo_root)
+        if not current:
+            print(colored("Error: No active task", Colors.RED), file=sys.stderr)
+            print("Pass a task explicitly: python3 task.py create-pr <task-dir>")
+            print("Or activate one first:  python3 task.py start <task-dir>")
+            return 1
+        target_dir = (repo_root / current).resolve()
+
+    task_json = target_dir / FILE_TASK_JSON
+    if not task_json.is_file():
+        print(colored(f"Error: task.json not found at {target_dir}", Colors.RED), file=sys.stderr)
+        return 1
+
+    data = read_json(task_json)
+    if not data:
+        return 1
+
+    dry_run = getattr(args, "dry_run", False)
+
+    # --- Preconditions -------------------------------------------------------
+    code, _, _ = run_git(["rev-parse", "--git-dir"], cwd=repo_root)
+    if code != 0:
+        print(colored("Error: Not a git repository — create-pr needs one.", Colors.RED), file=sys.stderr)
+        return 1
+
+    branch = data.get("branch")
+    if not branch:
+        print(colored("Error: Task has no branch set", Colors.RED), file=sys.stderr)
+        print(f"Set it with: python3 task.py set-branch {target_dir.name} <branch>")
+        return 1
+
+    base_branch = data.get("base_branch")
+    if not base_branch:
+        print(colored("Error: Task has no base branch (PR target) set", Colors.RED), file=sys.stderr)
+        print(f"Set it with: python3 task.py set-base-branch {target_dir.name} dev")
+        return 1
+
+    code, out, _ = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root)
+    current_branch = out.strip() if code == 0 else ""
+    if current_branch and current_branch != branch:
+        print(colored(f"Error: On branch '{current_branch}', but the task's branch is '{branch}'", Colors.RED), file=sys.stderr)
+        print(f"Switch first: git switch {branch}")
+        return 1
+
+    # --- Build the commands --------------------------------------------------
+    title = data.get("title") or target_dir.name
+    scope = data.get("scope")
+    if scope:
+        title = f"{scope}: {title}"
+
+    push_cmd = ["git", "push", "-u", "origin", branch]
+    gh_cmd = [
+        "gh", "pr", "create",
+        "--base", base_branch,
+        "--head", branch,
+        "--title", title,
+    ]
+    # `gh pr create` REQUIRES --body when it is not attached to a TTY, so this is
+    # always passed. An unfilled PRD skeleton ("TBD.") makes a useless body, so
+    # fall back to a pointer at the task instead of shipping the placeholder.
+    body = _extract_prd_goal(target_dir) or f"See `{_repo_relative_path(target_dir, repo_root)}/prd.md`."
+    gh_cmd += ["--body", body]
+
+    if dry_run:
+        print(colored("Dry run — nothing executed.", Colors.YELLOW))
+        print(f"  {subprocess.list2cmdline(push_cmd)}")
+        print(f"  {subprocess.list2cmdline(gh_cmd)}")
+        return 0
+
+    # --- gh availability -----------------------------------------------------
+    if shutil.which("gh") is None:
+        print(colored("Error: GitHub CLI (gh) not found", Colors.RED), file=sys.stderr)
+        _print_manual_pr_commands(push_cmd, gh_cmd)
+        return 1
+
+    result = subprocess.run(
+        ["gh", "auth", "status"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    if result.returncode != 0:
+        print(colored("Error: gh is not authenticated — run `gh auth login`", Colors.RED), file=sys.stderr)
+        _print_manual_pr_commands(push_cmd, gh_cmd)
+        return 1
+
+    # Idempotent: an existing PR is a success, not an error.
+    result = subprocess.run(
+        ["gh", "pr", "view", branch, "--json", "url", "-q", ".url"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=repo_root,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        print(colored(f"✓ PR already exists: {result.stdout.strip()}", Colors.GREEN))
+        return 0
+
+    # --- Execute -------------------------------------------------------------
+    code, _, err = run_git(["push", "-u", "origin", branch], cwd=repo_root)
+    if code != 0:
+        print(colored(f"Error: push failed: {err.strip()}", Colors.RED), file=sys.stderr)
+        return 1
+    print(colored(f"✓ Pushed {branch} to origin", Colors.GREEN))
+
+    result = subprocess.run(
+        gh_cmd,
+        capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=repo_root,
+    )
+    if result.returncode != 0:
+        print(colored(f"Error: gh pr create failed: {result.stderr.strip()}", Colors.RED), file=sys.stderr)
+        _print_manual_pr_commands(push_cmd, gh_cmd)
+        return 1
+
+    print(colored(f"✓ PR opened against {base_branch}", Colors.GREEN))
+    if result.stdout.strip():
+        print(f"  {result.stdout.strip()}")
     return 0

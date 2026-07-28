@@ -1,43 +1,55 @@
+# CI: one workflow for both integration lines.
+#
+# trellis-enhance's own git-workflow: feature → PR → dev → (manual) main.
+# This previously lived in two files — `ci.yml` (PRs into `main`, ran lint) and
+# `ci-dev.yml` (PRs into `dev`, no lint, no coverage gate). The steps drifted, so
+# `pnpm lint` never ran on the feature→dev path that every task actually uses,
+# and the diff-coverage gate this project ships to its users was not applied to
+# this repo at all. One file, one step list, no drift.
+#
+# Auto-merge only actually protects `dev` when the repo has branch protection on
+# `dev` with the "verify" check required + "Allow auto-merge" enabled.
+#
+# NOTE: deliberately no `paths-ignore`. "verify" is a required check on `dev`; a
+# skipped workflow never reports a status, so a docs-only PR would sit forever
+# waiting on a check that will never run.
+
 name: CI
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'packages/cli/**'
-      - 'packages/core/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'package.json'
-      - 'marketplace'
-      - '.github/workflows/ci.yml'
   pull_request:
-    branches: [main]
-    paths:
-      - 'packages/cli/**'
-      - 'packages/core/**'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'package.json'
-      - 'marketplace'
-      - '.github/workflows/ci.yml'
+    branches: [main, dev]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Single source of truth for the patch-coverage threshold.
+  DIFF_COVERAGE_MIN: 80
 
 jobs:
-  build:
+  verify:
+    name: verify
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout (with submodules — marketplace tests need it)
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 10.32.1
 
@@ -50,8 +62,8 @@ jobs:
       - name: Lint (core + cli)
         run: pnpm lint
 
-      - name: Test (core + cli)
-        run: pnpm test
+      - name: Test with coverage (core + cli)
+        run: pnpm test:coverage
 
       - name: Build (core then cli)
         run: pnpm build
@@ -66,3 +78,41 @@ jobs:
           test -d packages/cli/dist
           test -f packages/cli/dist/index.js
           echo "Build verification passed"
+
+      # Patch coverage on the lines this PR adds or changes. Both packages are
+      # measured — `core` is ~1/3 of the source, and a gate with a silent blind
+      # spot gives false assurance rather than none.
+      #
+      # Only files present in a coverage report are considered, so template
+      # `.md` / `.py` changes are not scored (they carry no TS coverage data).
+      - name: Diff coverage gate
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet diff-cover
+          diff-cover \
+            packages/core/coverage/cobertura-coverage.xml \
+            packages/cli/coverage/cobertura-coverage.xml \
+            --compare-branch "origin/${{ github.base_ref }}" \
+            --fail-under "${DIFF_COVERAGE_MIN}"
+
+  auto-merge:
+    name: enable-auto-merge
+    needs: verify
+    # Only the integration line auto-merges; `main` is released deliberately.
+    if: github.event_name == 'pull_request' && github.base_ref == 'dev' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # --delete-branch is required: the auto-merge request carries its own
+      # delete_branch flag (default false) which overrides the repository's
+      # delete_branch_on_merge setting, so merged feature branches were piling
+      # up on the remote despite that setting being enabled.
+      - name: Enable PR auto-merge (squash, head-commit pinned)
+        run: gh pr merge --auto --squash --delete-branch --match-head-commit "$HEAD_SHA" "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

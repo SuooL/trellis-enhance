@@ -3648,7 +3648,7 @@ print(len(entries))
     expect(body).toMatch(/Lightweight: `prd\.md` can be enough/);
     expect(body).toMatch(/Complex: finish `prd\.md`, `design\.md`, and `implement\.md`/);
     expect(body).toContain(
-      "curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start",
+      "complex tasks only: curate `implement.jsonl` and `check.jsonl` as spec/research manifests before start",
     );
   });
 
@@ -3659,13 +3659,22 @@ print(len(entries))
       "curated when extra spec or research context is needed",
     );
     expect(wf).toContain(
-      'Ready gate: both `implement.jsonl` and `check.jsonl` must contain at least one real `{"file": "...", "reason": "..."}` entry before `task.py start`.',
+      'Ready gate (complex tasks): both `implement.jsonl` and `check.jsonl` must contain at least one real `{"file": "...", "reason": "..."}` entry before `task.py start`.',
     );
     expect(wf).toContain(
-      "Runtime consumers tolerate missing or seed-only manifests for compatibility, but that tolerance is not a planning-ready state.",
+      "Runtime consumers tolerate missing or seed-only manifests for compatibility, but that tolerance is not a planning-ready state for a complex task.",
     );
     expect(wf).toContain(
-      "`implement.jsonl` and `check.jsonl` each contain at least one real curated entry (seed row does not count)",
+      "`implement.jsonl` and `check.jsonl` each contain at least one real curated entry, seed row does not count (complex tasks)",
+    );
+    // #292 scoped the gate to *complex* tasks ("complex sub-agent-dispatch
+    // tasks are not considered planning-complete until both manifests contain
+    // real entries"); the qualifier was lost when the text was written, so a
+    // lightweight PRD-only task was also being blocked. Keep both halves
+    // pinned: the gate still bites for complex tasks, and lightweight tasks
+    // are explicitly exempt.
+    expect(wf).toContain(
+      "Lightweight tasks are PRD-only and skip this step",
     );
 
     const templateRoot = path.join(
@@ -3686,7 +3695,7 @@ print(len(entries))
         "utf-8",
       );
       expect(content, relativePath).toContain(
-        "Sub-agent-dispatch tasks have real curated entries in both `implement.jsonl` and `check.jsonl`; seed-only manifests are not ready.",
+        "Complex sub-agent-dispatch tasks have real curated entries in both `implement.jsonl` and `check.jsonl`; seed-only manifests are not ready. Lightweight PRD-only tasks skip this.",
       );
     }
   });
@@ -5554,10 +5563,10 @@ describe("regression: copilot agents use YAML tools frontmatter", () => {
 
   it("maps research agent MCP tools to Copilot tool names", () => {
     // research is the one agent that legitimately needs external search.
-    // Its source uses the wildcard `mcp__*` (avoids the explicit-name
-    // silent-skip, opts into any MCP the user has configured) and the
-    // Copilot transformer maps that wildcard to the full set of supported
-    // Copilot MCP tool equivalents.
+    // Its source names MCP servers explicitly — a bare `mcp__*` wildcard was
+    // measured (2026-07-27) to match nothing, leaving the agent with zero MCP
+    // tools. The Copilot transformer maps those explicit names onto Copilot's
+    // own external-tool vocabulary.
     const content = fs.readFileSync(
       path.join(tmpDir, ".github/agents/trellis-research.agent.md"),
       "utf-8",
@@ -6119,6 +6128,37 @@ describe("regression: sub-agent context injection fallback (0.5.3)", () => {
       expect(content).toContain(expectedJsonl);
     });
   }
+
+  // The check agent's review tiering and its anti-silent-fallback disclosure
+  // live in prompt prose, not in code, so nothing else stops a later edit from
+  // quietly dropping them. Claude is the only platform carrying the cross-model
+  // review flow; the other trellis-check variants are deliberately out of scope.
+  it("claude/check agent pins the docs-only tier boundary and the reviewer disclosure", () => {
+    const content = fs.readFileSync(
+      path.join(repoRootFb, "packages/cli/src/templates/claude/agents/trellis-check.md"),
+      "utf-8",
+    );
+
+    // The tier is chosen by file type, so the concrete extension set has to stay
+    // spelled out — "documentation" alone is not a decidable boundary.
+    expect(content).toContain("Docs-only tier");
+    for (const ext of ["*.md", "*.txt", "*.rst"]) {
+      expect(content).toContain(ext);
+    }
+    // ...and never by diff size: a one-line source change can still be a bug.
+    expect(content).toMatch(/never by how many lines/i);
+    // Ambiguous paths must fail closed to the full tier.
+    expect(content).toMatch(/unsure[\s\S]{0,120}treat it as source/i);
+
+    // Bounded Codex retry and bounded verify loop.
+    expect(content).toMatch(/Failure budget[\s\S]{0,40}one retry/i);
+    expect(content).toMatch(/at most 3 cycles/i);
+
+    // A silent fallback is the exact failure this agent exists to prevent, so
+    // the report has to lead with which reviewer actually ran.
+    expect(content).toContain("**Reviewer**");
+    expect(content).toMatch(/native self-review/i);
+  });
 
   for (const agent of ["implement", "check"] as const) {
     it(`kiro/${agent} JSON agent carries marker + fallback protocol in prompt`, () => {

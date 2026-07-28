@@ -129,7 +129,12 @@ describe("trellis template constants", () => {
     expect(workflowMdTemplate).toContain("#");
   });
 
-  it("marketplace native workflow mirror matches the bundled workflow", () => {
+  // trellis-enhance fork: our bundled workflow.md intentionally diverges from the
+  // upstream `marketplace` submodule mirror (custom states needs-rework/blocked/
+  // deploying, Phase 3.5, adversarial-review routing). The mirror belongs to
+  // upstream (mindfold-ai/marketplace) and we don't sync it, so this exact-match
+  // check no longer applies. Skipped deliberately.
+  it.skip("marketplace native workflow mirror matches the bundled workflow", () => {
     const repoRoot = fs.existsSync(path.join(process.cwd(), "marketplace"))
       ? process.cwd()
       : path.resolve(process.cwd(), "../..");

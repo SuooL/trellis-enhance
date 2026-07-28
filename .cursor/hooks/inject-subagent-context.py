@@ -384,7 +384,14 @@ All the information you need has been prepared for you:
 
 
 def build_check_prompt(original_prompt: str, context: str) -> str:
-    """Build complete prompt for Check"""
+    """Build complete prompt for Check.
+
+    Injects context only — the review workflow itself belongs to each
+    platform's `trellis-check` agent definition, not to this shared hook.
+    Prescribing one here forced a single platform's flow onto all consumers
+    (e.g. Claude's agent delegates the review to a cross-model reviewer,
+    which directly contradicted a hardcoded "check item by item yourself").
+    """
     return f"""<!-- trellis-hook-injected -->
 # Check Agent Task
 
@@ -400,22 +407,7 @@ All check specs and dev specs you need:
 
 ## Your Task
 
-{original_prompt}
-
----
-
-## Workflow
-
-1. **Get changes** - Run `git diff --name-only` and `git diff` to get code changes
-2. **Check against specs** - Check item by item against specs above
-3. **Self-fix** - Fix issues directly, don't just report
-4. **Run verification** - Run project's lint and typecheck commands
-
-## Important Constraints
-
-- Fix issues yourself, don't just report
-- Must execute complete checklist in check specs
-- Pay special attention to impact radius analysis (L1-L5)"""
+{original_prompt}"""
 
 
 def build_finish_prompt(original_prompt: str, context: str) -> str:

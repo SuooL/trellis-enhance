@@ -2,7 +2,7 @@
 name: trellis-research
 description: |
   Code and tech search expert. Finds files, patterns, and tech solutions, and PERSISTS every finding to the current task's research/ directory. No code modifications outside that directory.
-tools: Read, Write, Glob, Grep, Bash, Skill, mcp__*
+tools: Read, Write, Glob, Grep, Bash, Skill, mcp__codex__codex, mcp__codex__codex-reply, mcp__plugin_context7_context7__*, mcp__zotero-mcp__*, mcp__plugin_chrome-devtools-mcp_chrome-devtools__*
 ---
 # Research Agent
 

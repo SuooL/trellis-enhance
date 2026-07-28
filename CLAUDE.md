@@ -24,11 +24,11 @@ an adversarial-review capability, and a Git/CI standard — baked into every `tr
 ## What's customized (all in `packages/cli/src/templates/…` + `…/configurators/`)
 | Area | What | Key files |
 |---|---|---|
-| **Sub-agent models** | implement=**Opus 4.8**; research=**Sonnet** (+ `mcp__codex__codex` tool for a cross-model 2nd opinion); check=**cross-model** — a thin Claude wrapper that delegates the review to **Codex GPT-5.5 (effort xhigh, read-only)** and applies fixes (Design 1) | `templates/claude/agents/trellis-{implement,research,check}.md` |
+| **Sub-agent models** | implement=**Opus 4.8**; research=**Sonnet** (+ `mcp__codex__codex` for a cross-model 2nd opinion); check=**cross-model** — delegates the review to **Codex GPT-5.5 (xhigh, read-only)** and applies the fixes. Agent `tools:` must name MCP servers explicitly (`mcp__codex__codex`, not `mcp__*` — a bare wildcard grants **zero** tools and silently disables the cross-model review). Check has a docs-only tier, a 1-retry Codex budget, a 3-cycle verify cap, and must state which reviewer actually ran. | `templates/claude/agents/trellis-{implement,research,check}.md` |
 | **Custom workflow states** | `needs-rework` / `blocked` / `deploying`, with per-turn breadcrumbs + `/continue` routing; writer = new `task.py set-status` (+ `cmd_set_status` in task_store) | `templates/trellis/workflow.md`, `templates/common/commands/continue.md`, `templates/trellis/scripts/task.py`, `…/common/task_store.py` |
-| **Question / adversarial review** | On-demand multi-role, **dual independent panels (Opus 4.8 + Codex GPT-5.5)** critical review; keyword-triggered skill + explicit command. New skill must be registered in `SKILL_DESCRIPTIONS` (shared.ts) | `templates/common/skills/adversarial-review.md`, `templates/common/commands/question.md`, `configurators/shared.ts` |
-| **Git/CI standard** (always generated) | 3-branch model (main=release / dev=integration+CD-to-prod / `feature/<task-slug>`); PR→dev → CI (build+tests+**diff-coverage ≥ 80%**) → auto-merge; dev→prod SSH deploy (opt-in via `vars.DEPLOY_ENABLED`); manual `workflow_dispatch` release; weekly branch prune. Emitted on every `trellis init`. | `templates/git-workflow/` (spec + 4 `.github/workflows/*.yml` + README), wired in `templates/git-workflow/index.ts` + `configurators/workflow.ts` + `templates/trellis/index.ts` |
-| **Branch lifecycle hook** | `after_create` → create `feature/<slug>` off `dev` (safe-skips on non-git); `after_archive` → delete merged branch | `templates/trellis/scripts/hooks/git_branch.py`, `templates/trellis/config.yaml` (hooks) |
+| **Question / adversarial review** | On-demand multi-role review, **two independent panels (native + exactly one Codex GPT-5.5 call)**. Explicit trigger only — not casual phrasing, and not code diffs (that's `trellis-check`). Output is proportional: a file when worth keeping, inline for a short answer. New skill must be registered in `SKILL_DESCRIPTIONS` (shared.ts) | `templates/common/skills/adversarial-review.md`, `templates/common/commands/question.md`, `configurators/shared.ts` |
+| **Git/CI standard** (always generated) | 3-branch model (main=release / dev=integration+CD-to-prod / `feature/<task-slug>`); PR→dev via `task.py create-pr` (it owns the push) → CI (typecheck+lint+tests+**diff-coverage ≥ 80%**) → auto-merge with `--delete-branch`; dev→prod SSH deploy (opt-in via `vars.DEPLOY_ENABLED`); manual `workflow_dispatch` release; weekly branch prune. Emitted on every `trellis init`. | `templates/git-workflow/` (spec + 4 `.github/workflows/*.yml` + README), wired in `templates/git-workflow/index.ts` + `configurators/workflow.ts` + `templates/trellis/index.ts` |
+| **Branch lifecycle hook** | `after_create` → create `feature/<slug>` off `dev` and record `dev` as `base_branch` (safe-skips on non-git); `after_archive` → delete the local branch **only when it was a non-squash merge** — the check is ancestry-based, so under the default squash auto-merge it safe-skips and the local branch is left behind. Remote deletion is handled by CI's `--delete-branch`. | `templates/trellis/scripts/hooks/git_branch.py`, `templates/trellis/config.yaml` (hooks) |
 
 ## How install works — symlink dev, rebuild = live, NEVER reinstall
 
@@ -49,10 +49,11 @@ pnpm --filter trellis-enhance build    # tsc + copy-templates → dist/ ; global
 **Self-owned updates:** `trellis update` in a project refreshes its `.trellis/` from THIS CLI's templates only. The upstream-npm version check was removed (`getLatestNpmVersion()` returns null) — it never phones `registry.npmjs.org`.
 
 ```bash
-pnpm --filter trellis-enhance typecheck
-pnpm --filter trellis-enhance test     # NOTE: 2 pre-existing failures in test/templates/trellis.test.ts
-                                       # (missing marketplace/workflows/{native,tdd}/workflow.md) are
-                                       # UPSTREAM/env, not from this fork.
+pnpm typecheck                         # core + cli
+pnpm lint                              # core + cli — CI gates on this now
+pnpm test                              # baseline is FULLY GREEN; any failure is yours
+pnpm test:coverage                     # writes the cobertura reports the CI diff-coverage gate reads
+
 # Smoke-test the generated output in a scratch dir:
 d=$(mktemp -d); (cd "$d" && git init -q && node /Users/suool/git/Trellis/packages/cli/dist/cli/index.js init --claude -y -u tester)
 ```
