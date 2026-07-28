@@ -1,0 +1,15 @@
+# args: $1 prev_head  $2 new_head  $3 branch_flag(1=branch switch)
+#
+# The global `trellis` / `tl` command is symlinked to this repo's built dist/, so
+# it runs "whatever branch is checked out here + last build". Rebuild on branch
+# switch, but only when product source actually differs — otherwise every
+# doc-only checkout would pay for a full tsc run.
+[ "$3" = "1" ] || exit 0
+if git diff --name-only "$1" "$2" 2>/dev/null | grep -qE '^packages/(cli|core)/(src|scripts)/'; then
+  printf '[trellis-enhance] branch product differs — rebuilding CLI...\n'
+  if pnpm --filter trellis-enhance build >/dev/null 2>&1; then
+    printf "[trellis-enhance] ✓ build done.\n"
+  else
+    printf "[trellis-enhance] ✗ build FAILED — run: pnpm --filter trellis-enhance build\n"
+  fi
+fi

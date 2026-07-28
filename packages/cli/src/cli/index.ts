@@ -114,7 +114,7 @@ program
   )
   .option(
     "--workflow <id>",
-    "Workflow template id for .trellis/workflow.md (default: native; e.g., tdd, channel-driven-subagent-dispatch)",
+    "Workflow template id for .trellis/workflow.md (default: native; other ids are resolved from the marketplace — see `trellis workflow --list`)",
   )
   .option(
     "--workflow-source <source>",
@@ -256,11 +256,11 @@ program
 program
   .command("workflow")
   .description(
-    "List or switch the project's .trellis/workflow.md template (native, tdd, channel-driven-subagent-dispatch, or marketplace)",
+    "List or switch the project's .trellis/workflow.md template (native, or any id served by the configured marketplace)",
   )
   .option(
     "-t, --template <id>",
-    "Workflow template id (e.g., native, tdd, channel-driven-subagent-dispatch)",
+    "Workflow template id (default: native; run --list to see what the marketplace offers)",
   )
   .option(
     "-m, --marketplace <source>",
