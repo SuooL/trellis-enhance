@@ -1,6 +1,0 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
-{"file": ".trellis/spec/cli/backend/script-conventions.md", "reason": "task.py 新增 create-pr 子命令必须遵循既有脚本约定（参数、退出码、输出风格）"}
-{"file": ".trellis/spec/cli/backend/error-handling.md", "reason": "降级矩阵 6 种情形要求可读提示、明确退出码、无栈回溯"}
-{"file": ".trellis/spec/cli/backend/platform-integration.md", "reason": "改动 shared-hooks 影响 5 个平台的 prompt 注入路径"}
-{"file": ".trellis/spec/cli/backend/configurator-shared.md", "reason": "模板双路径一致性约束（init 写入 vs update 收集）"}
-{"file": ".trellis/tasks/07-27-broken-step-repair/research/inject-subagent-context-check-workflow-audit.md", "reason": "5 平台自足性调研结论，支撑整段删除 workflow 的决策"}
